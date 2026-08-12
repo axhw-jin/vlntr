@@ -58,9 +58,54 @@
     border: 1px solid var(--line);
   }
 
-  main { padding: 0 16px 72px; }
+  main { padding: 8px 16px 72px; }
 
-  .hero { padding: 56px 0 40px; }
+  /* 히어로: Spline 3D 리본을 배경으로 깔고 그 위에 텍스트를 올린다.
+     iframe은 pointer-events를 꺼서 스크롤·클릭을 가로채지 않게 한다. */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    background: #eef1f6;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      rgba(246, 247, 249, 0.97) 0%,
+      rgba(246, 247, 249, 0.9) 34%,
+      rgba(246, 247, 249, 0.45) 58%,
+      rgba(246, 247, 249, 0) 78%
+    );
+  }
+  .hero-inner {
+    position: relative;
+    z-index: 1;
+    padding: 88px 16px 72px;
+    min-height: 460px;
+  }
+  @media (max-width: 700px) {
+    .hero::after {
+      background: linear-gradient(
+        180deg,
+        rgba(246, 247, 249, 0.92) 0%,
+        rgba(246, 247, 249, 0.8) 45%,
+        rgba(246, 247, 249, 0.97) 100%
+      );
+    }
+    .hero-inner { padding: 56px 16px 48px; min-height: 400px; }
+  }
   .eyebrow {
     display: inline-block;
     font-size: 12px;
@@ -79,10 +124,16 @@
   .lede { margin: 0 0 24px; font-size: 16px; color: var(--muted); max-width: 34em; }
   .cta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .cta a.btn { padding: 11px 22px; font-size: 15px; }
+  .hero .cta a.btn.ghost {
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--text);
+    backdrop-filter: blur(4px);
+  }
   .stat { margin: 18px 0 0; font-size: 14px; color: var(--muted); min-height: 22px; }
   .stat b { color: var(--text); font-weight: 600; }
 
   section { padding: 32px 0; border-top: 1px solid var(--line); }
+  main section:first-of-type { border-top: 0; }
   h2 { margin: 0 0 6px; font-size: 18px; }
   .sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
 
@@ -90,7 +141,6 @@
   @media (max-width: 560px) {
     .grid { grid-template-columns: 1fr; }
     h1 { font-size: 27px; }
-    .hero { padding: 40px 0 32px; }
   }
   .card {
     background: var(--card);
@@ -165,8 +215,15 @@
   </div>
 </header>
 
-<main class="wrap">
-  <div class="hero">
+<div class="hero">
+  <iframe
+    class="hero-bg"
+    src="https://my.spline.design/flowingribbon-eKDbKTWMs8LtWEK4ugdRGoVe/"
+    title="흐르는 리본 3D 그래픽"
+    loading="lazy"
+    aria-hidden="true"
+    tabindex="-1"></iframe>
+  <div class="wrap hero-inner">
     <span class="eyebrow">봉사 기회 매칭</span>
     <h1>봉사할 사람과<br>봉사할 곳을 잇습니다.</h1>
     <p class="lede">
@@ -179,7 +236,9 @@
     </div>
     <p class="stat" id="stat"></p>
   </div>
+</div>
 
+<main class="wrap">
   <section>
     <h2>어떻게 쓰나요</h2>
     <p class="sub">등록부터 연락까지 네 단계면 끝납니다.</p>
