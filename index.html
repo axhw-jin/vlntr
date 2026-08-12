@@ -32,6 +32,17 @@
   .wrap { max-width: 720px; margin: 0 auto; }
   h1 { margin: 0; font-size: 20px; }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .new-link {
+    flex: none;
+    font-size: 14px;
+    text-decoration: none;
+    color: #fff;
+    background: var(--accent);
+    padding: 9px 16px;
+    border-radius: 8px;
+  }
+  .new-link:hover { filter: brightness(1.08); }
   main { padding: 20px 16px 60px; }
   .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
   .card {
@@ -87,9 +98,12 @@
 </head>
 <body>
 <header>
-  <div class="wrap">
-    <h1>vlntr</h1>
-    <p>봉사 기회를 확인하고 참여를 신청하세요.</p>
+  <div class="wrap head-row">
+    <div>
+      <h1>vlntr</h1>
+      <p>봉사 기회를 확인하고 참여를 신청하세요.</p>
+    </div>
+    <a class="new-link" href="./new.html">기회 등록</a>
   </div>
 </header>
 

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vlntr — 봉사 기회 등록</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #16181d;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #2563eb;
+    --ok: #0f7b4f;
+    --ok-weak: #e6f4ed;
+    --err: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, "Malgun Gothic", sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 20px 16px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  a:hover { text-decoration: underline; }
+  main { padding: 20px 16px 60px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  label { display: block; margin-bottom: 16px; font-size: 14px; }
+  label span { display: block; margin-bottom: 6px; color: var(--muted); }
+  input {
+    font: inherit;
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .pair { display: flex; gap: 10px; align-items: center; }
+  .pair span.sep { color: var(--muted); }
+  button {
+    font: inherit;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { cursor: not-allowed; opacity: 0.7; }
+  .actions { display: flex; align-items: center; gap: 12px; }
+  .msg { font-size: 14px; }
+  .msg.error { color: var(--err); }
+  .msg.ok { color: var(--ok); }
+  .hint { color: var(--muted); font-size: 13px; margin: -8px 0 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>봉사 기회 등록</h1>
+    <p>참여자를 모집할 봉사 활동을 올려주세요. <a href="./index.html">목록으로</a></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <form class="card" id="form">
+    <label>
+      <span>활동 이름</span>
+      <input name="title" maxlength="80" placeholder="예: 지역 아동센터 학습 멘토링" required>
+    </label>
+
+    <label>
+      <span>기관 / 담당자</span>
+      <input name="org" maxlength="60" placeholder="예: 행복나눔 아동센터" required>
+    </label>
+
+    <label>
+      <span>위치</span>
+      <input name="location" maxlength="80" placeholder="예: 서울 마포구 성산동" required>
+    </label>
+
+    <label>
+      <span>날짜</span>
+      <input name="date" type="date" required>
+    </label>
+
+    <label>
+      <span>시간</span>
+      <div class="pair">
+        <input name="start" type="time" required>
+        <span class="sep">~</span>
+        <input name="end" type="time" required>
+      </div>
+    </label>
+
+    <label>
+      <span>모집 인원</span>
+      <input name="needed" type="number" min="1" max="1000" step="1" placeholder="예: 5" required>
+    </label>
+    <p class="hint">등록하면 목록에 바로 공개됩니다.</p>
+
+    <div class="actions">
+      <button type="submit">등록하기</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </form>
+</main>
+
+<script>
+const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3Nsc3pkZ2Jkamh3cGF5b2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Mjk5MDYsImV4cCI6MjEwMjAwNTkwNn0.jGLzzUzs6bV3OqNIaVhnfLh_rUxwn0mW8BFsfCfq_A8";
+
+const form = document.getElementById("form");
+const msgEl = document.getElementById("msg");
+const submitBtn = form.querySelector('button[type="submit"]');
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 목록 화면과 같은 표기로 맞춘다: "2026-08-22 (토)", "14:00 ~ 17:00"
+function formatDate(value) {
+  const d = new Date(value + "T00:00:00");
+  if (isNaN(d)) return value;
+  return value + " (" + WEEKDAYS[d.getDay()] + ")";
+}
+
+form.addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const f = form.elements;
+  const start = f.start.value;
+  const end = f.end.value;
+
+  if (end <= start) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "종료 시간이 시작 시간보다 뒤여야 합니다.";
+    return;
+  }
+
+  msgEl.textContent = "";
+  submitBtn.disabled = true;
+  submitBtn.textContent = "등록 중…";
+
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/create_opportunity", {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_title: f.title.value.trim(),
+        p_org: f.org.value.trim(),
+        p_location: f.location.value.trim(),
+        p_event_date: formatDate(f.date.value),
+        p_event_time: start + " ~ " + end,
+        p_needed: Number(f.needed.value),
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "등록 실패");
+
+    msgEl.className = "msg ok";
+    msgEl.textContent = "등록되었습니다. 목록으로 이동합니다…";
+    setTimeout(function () {
+      location.href = "./index.html";
+    }, 900);
+  } catch (err) {
+    console.error(err);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "등록하기";
+    msgEl.className = "msg error";
+    msgEl.textContent = "등록에 실패했습니다. 입력을 확인하고 다시 시도해 주세요.";
+  }
+});
+</script>
+</body>
+</html>
