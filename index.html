@@ -421,7 +421,8 @@
   <div class="wrap">
     vlntr — 봉사 기회 매칭 서비스 ·
     <a href="./list.html">기회 목록</a> ·
-    <a href="./new.html">기회 등록</a>
+    <a href="./new.html">기회 등록</a> ·
+    <a href="./mypage.html">마이페이지</a>
   </div>
 </footer>
 
@@ -448,6 +449,7 @@ function renderHeader(user) {
     headEl.innerHTML =
       '<span class="who">' + esc(label) + "</span>" +
       '<a class="btn" href="./new.html">기회 등록</a>' +
+      '<a class="btn ghost" href="./mypage.html">마이페이지</a>' +
       '<button class="ghost" id="signOut">로그아웃</button>';
     document.getElementById("signOut").addEventListener("click", function () {
       supabase.auth.signOut();

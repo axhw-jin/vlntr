@@ -13,7 +13,6 @@
     --line: #e3e6ea;
     --accent: #2563eb;
     --ok: #0f7b4f;
-    --ok-weak: #e6f4ed;
     --err: #b42318;
   }
   * { box-sizing: border-box; }
@@ -42,8 +41,8 @@
     padding: 20px;
   }
   label { display: block; margin-bottom: 16px; font-size: 14px; }
-  label span { display: block; margin-bottom: 6px; color: var(--muted); }
-  input {
+  label > span { display: block; margin-bottom: 6px; color: var(--muted); }
+  input, select, textarea {
     font: inherit;
     width: 100%;
     padding: 9px 12px;
@@ -52,9 +51,16 @@
     background: #fff;
     color: var(--text);
   }
-  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .pair { display: flex; gap: 10px; align-items: center; }
-  .pair span.sep { color: var(--muted); }
+  textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  /* 시간 선택: 시/분을 따로 고르게 해 초 단위를 없애고 분은 15분 단위로 제한 */
+  .time-row { display: flex; align-items: center; gap: 8px; }
+  .time-group { display: flex; align-items: center; gap: 4px; flex: 1; }
+  .time-group select { width: auto; flex: 1; min-width: 0; padding: 9px 8px; text-align: center; }
+  .time-group .colon { color: var(--muted); }
+  .time-row .sep { color: var(--muted); flex: none; }
+
   button {
     font: inherit;
     padding: 10px 20px;
@@ -66,18 +72,25 @@
   }
   button:hover:not(:disabled) { filter: brightness(1.08); }
   button:disabled { cursor: not-allowed; opacity: 0.7; }
-  .actions { display: flex; align-items: center; gap: 12px; }
+  button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .msg { font-size: 14px; }
   .msg.error { color: var(--err); }
   .msg.ok { color: var(--ok); }
   .hint { color: var(--muted); font-size: 13px; margin: -8px 0 16px; }
+  .counter { float: right; color: var(--muted); font-weight: 400; }
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
-    <h1>봉사 기회 등록</h1>
-    <p>참여자를 모집할 봉사 활동을 올려주세요. <a href="./list.html">목록으로</a></p>
+    <h1 id="pageTitle">봉사 기회 등록</h1>
+    <p id="pageDesc">참여자를 모집할 봉사 활동을 올려주세요.
+      <a href="./list.html">목록으로</a> · <a href="./mypage.html">마이페이지</a></p>
   </div>
 </header>
 
@@ -86,6 +99,8 @@
     <p style="margin:0 0 14px">기회를 등록하려면 로그인이 필요합니다.</p>
     <button type="button" id="signIn">구글로 로그인</button>
   </div>
+
+  <p class="msg error" id="loadError" hidden></p>
 
   <form class="card" id="form" hidden>
     <label>
@@ -110,21 +125,37 @@
 
     <label>
       <span>시간</span>
-      <div class="pair">
-        <input name="start" type="time" required>
+      <div class="time-row">
+        <div class="time-group">
+          <select name="startH" aria-label="시작 시" required></select>
+          <span class="colon">:</span>
+          <select name="startM" aria-label="시작 분" required></select>
+        </div>
         <span class="sep">~</span>
-        <input name="end" type="time" required>
+        <div class="time-group">
+          <select name="endH" aria-label="종료 시" required></select>
+          <span class="colon">:</span>
+          <select name="endM" aria-label="종료 분" required></select>
+        </div>
       </div>
     </label>
+    <p class="hint">분은 15분 단위로 선택할 수 있습니다.</p>
 
     <label>
       <span>모집 인원</span>
       <input name="needed" type="number" min="1" max="1000" step="1" placeholder="예: 5" required>
     </label>
-    <p class="hint">등록하면 목록에 바로 공개됩니다.</p>
+    <p class="hint" id="neededHint" hidden></p>
+
+    <label>
+      <span>상세 설명 <span class="counter" id="descCount">0 / 2000</span></span>
+      <textarea name="description" maxlength="2000" rows="5"
+        placeholder="어떤 일을 하게 되는지, 준비물이나 유의사항이 있다면 적어주세요. (선택)"></textarea>
+    </label>
 
     <div class="actions">
-      <button type="submit">등록하기</button>
+      <button type="submit" id="submitBtn">등록하기</button>
+      <a href="./list.html" style="font-size:14px">취소</a>
       <span class="msg" id="msg"></span>
     </div>
   </form>
@@ -142,9 +173,17 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const gate = document.getElementById("gate");
 const form = document.getElementById("form");
 const msgEl = document.getElementById("msg");
-const submitBtn = form.querySelector('button[type="submit"]');
+const loadErrorEl = document.getElementById("loadError");
+const submitBtn = document.getElementById("submitBtn");
+const neededHint = document.getElementById("neededHint");
+const descCount = document.getElementById("descCount");
+
+// ?id=123 이면 수정 모드
+const editId = Number(new URLSearchParams(location.search).get("id")) || null;
+let loadedFor = null; // 수정 대상을 이미 불러온 사용자 id
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const MINUTES = ["00", "15", "30", "45"];
 
 // 목록 화면과 같은 표기로 맞춘다: "2026-08-22 (토)", "14:00 ~ 17:00"
 function formatDate(value) {
@@ -153,12 +192,93 @@ function formatDate(value) {
   return value + " (" + WEEKDAYS[d.getDay()] + ")";
 }
 
+function fillTimeSelects() {
+  const pad = (n) => String(n).padStart(2, "0");
+  for (const which of ["start", "end"]) {
+    const h = form.elements[which + "H"];
+    const m = form.elements[which + "M"];
+    h.innerHTML = Array.from({ length: 24 }, (_, i) =>
+      '<option value="' + pad(i) + '">' + pad(i) + "</option>").join("");
+    m.innerHTML = MINUTES.map((v) => '<option value="' + v + '">' + v + "</option>").join("");
+  }
+  form.elements.startH.value = "09";
+  form.elements.startM.value = "00";
+  form.elements.endH.value = "12";
+  form.elements.endM.value = "00";
+}
+
+function readTime(which) {
+  return form.elements[which + "H"].value + ":" + form.elements[which + "M"].value;
+}
+
+// 기존 데이터가 15분 단위가 아닐 수 있으므로, 없는 값이면 옵션을 만들어 넣는다
+function setTime(which, hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || "").trim());
+  if (!m) return;
+  const hSel = form.elements[which + "H"];
+  const mSel = form.elements[which + "M"];
+  const hh = m[1].padStart(2, "0");
+  const mm = m[2];
+  if (![...hSel.options].some((o) => o.value === hh)) hSel.add(new Option(hh, hh));
+  if (![...mSel.options].some((o) => o.value === mm)) mSel.add(new Option(mm, mm));
+  hSel.value = hh;
+  mSel.value = mm;
+}
+
+function updateDescCount() {
+  descCount.textContent = form.elements.description.value.length + " / 2000";
+}
+form.elements.description.addEventListener("input", updateDescCount);
+
+async function loadForEdit(user) {
+  if (!editId || loadedFor === user.id) return;
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("id", editId)
+    .maybeSingle();
+
+  if (error || !data) {
+    form.hidden = true;
+    loadErrorEl.hidden = false;
+    loadErrorEl.textContent = "해당 기회를 찾을 수 없습니다.";
+    return;
+  }
+  if (data.owner_id !== user.id) {
+    form.hidden = true;
+    loadErrorEl.hidden = false;
+    loadErrorEl.textContent = "내가 올린 기회만 수정할 수 있습니다.";
+    return;
+  }
+
+  const f = form.elements;
+  f.title.value = data.title;
+  f.org.value = data.org;
+  f.location.value = data.location;
+  f.date.value = (/^\d{4}-\d{2}-\d{2}/.exec(data.event_date) || [""])[0];
+  const t = /^(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})$/.exec(data.event_time || "");
+  if (t) { setTime("start", t[1]); setTime("end", t[2]); }
+  f.needed.value = data.needed;
+  f.description.value = data.description || "";
+  updateDescCount();
+
+  f.needed.min = Math.max(1, data.applied);
+  if (data.applied > 0) {
+    neededHint.hidden = false;
+    neededHint.textContent = "이미 " + data.applied + "명이 신청해서, 그보다 적게 줄일 수 없습니다.";
+  }
+
+  loadedFor = user.id;
+  loadErrorEl.hidden = true;
+}
+
 form.addEventListener("submit", async function (e) {
   e.preventDefault();
 
   const f = form.elements;
-  const start = f.start.value;
-  const end = f.end.value;
+  const start = readTime("start");
+  const end = readTime("end");
 
   if (end <= start) {
     msgEl.className = "msg error";
@@ -168,52 +288,73 @@ form.addEventListener("submit", async function (e) {
 
   msgEl.textContent = "";
   submitBtn.disabled = true;
-  submitBtn.textContent = "등록 중…";
+  submitBtn.textContent = editId ? "저장 중…" : "등록 중…";
 
-  const { error } = await supabase.rpc("create_opportunity", {
+  const payload = {
     p_title: f.title.value.trim(),
     p_org: f.org.value.trim(),
     p_location: f.location.value.trim(),
     p_event_date: formatDate(f.date.value),
     p_event_time: start + " ~ " + end,
     p_needed: Number(f.needed.value),
-  });
+    p_description: f.description.value.trim(),
+  };
+
+  const { error } = editId
+    ? await supabase.rpc("update_opportunity", Object.assign({ p_id: editId }, payload))
+    : await supabase.rpc("create_opportunity", payload);
 
   if (error) {
     console.error(error);
     submitBtn.disabled = false;
-    submitBtn.textContent = "등록하기";
+    submitBtn.textContent = editId ? "저장하기" : "등록하기";
     msgEl.className = "msg error";
     msgEl.textContent =
       error.message === "login required"
         ? "로그인이 필요합니다. 다시 로그인해 주세요."
-        : "등록에 실패했습니다. 입력을 확인하고 다시 시도해 주세요.";
+        : error.message === "not the owner"
+        ? "내가 올린 기회만 수정할 수 있습니다."
+        : error.message === "needed below applied"
+        ? "이미 신청한 인원보다 적게 줄일 수 없습니다."
+        : (editId ? "저장" : "등록") + "에 실패했습니다. 입력을 확인하고 다시 시도해 주세요.";
     return;
   }
 
   msgEl.className = "msg ok";
-  msgEl.textContent = "등록되었습니다. 목록으로 이동합니다…";
+  msgEl.textContent = editId ? "저장되었습니다. 이동합니다…" : "등록되었습니다. 목록으로 이동합니다…";
   setTimeout(function () {
-    location.href = "./list.html";
+    location.href = editId ? "./mypage.html" : "./list.html";
   }, 900);
 });
 
 document.getElementById("signIn").addEventListener("click", function () {
   supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: location.origin + location.pathname },
+    options: { redirectTo: location.origin + location.pathname + location.search },
   });
 });
 
 function applySession(session) {
-  const loggedIn = Boolean(session?.user);
-  form.hidden = !loggedIn;
-  gate.hidden = loggedIn;
+  const user = session?.user || null;
+  gate.hidden = Boolean(user);
+  form.hidden = !user;
+  if (user) loadForEdit(user);
 }
 
 supabase.auth.onAuthStateChange(function (_event, session) {
   applySession(session);
 });
+
+fillTimeSelects();
+updateDescCount();
+
+if (editId) {
+  document.getElementById("pageTitle").textContent = "봉사 기회 수정";
+  document.getElementById("pageDesc").innerHTML =
+    '올린 내용을 고칠 수 있습니다. <a href="./mypage.html">마이페이지로</a>';
+  submitBtn.textContent = "저장하기";
+  document.title = "vlntr — 봉사 기회 수정";
+}
 
 const { data } = await supabase.auth.getSession();
 applySession(data.session);

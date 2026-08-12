@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vlntr — 마이페이지</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #16181d;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #2563eb;
+    --ok: #0f7b4f;
+    --ok-weak: #e6f4ed;
+    --err: #b42318;
+    --err-weak: #fdeceb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, "Malgun Gothic", sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 20px 16px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 20px; }
+  h1 a { color: inherit; text-decoration: none; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .head-actions { flex: none; display: flex; align-items: center; gap: 10px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  a.btn, button {
+    font: inherit;
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-block;
+  }
+  a.btn:hover, button:hover:not(:disabled) { filter: brightness(1.08); text-decoration: none; }
+  button:disabled { cursor: not-allowed; opacity: 0.7; }
+  a.btn.ghost, button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  button.danger { background: transparent; color: var(--err); border: 1px solid #f3c9c5; }
+
+  main { padding: 20px 16px 60px; }
+
+  .tabs { display: flex; gap: 8px; margin: 0 0 16px; }
+  .tabs button {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .tabs button[aria-selected="true"] {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card.dim { background: #fbfbfc; }
+  .card h2 { margin: 0 0 4px; font-size: 17px; }
+  .org { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    border-radius: 999px;
+    padding: 1px 9px;
+    margin-left: 6px;
+    vertical-align: middle;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--line);
+  }
+  .badge.hidden-b { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+  .badge.full-b { color: var(--ok); background: var(--ok-weak); border-color: #cde9dc; }
+  dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; row-gap: 6px; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; }
+  .desc {
+    margin: 12px 0 0;
+    font-size: 14px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    border-left: 2px solid var(--line);
+    padding-left: 10px;
+  }
+  .actions { margin-top: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--muted); }
+  .note.done { color: var(--ok); }
+  .row-err { font-size: 13px; color: var(--err); }
+
+  .roster {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .roster h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .roster ul { margin: 0; padding-left: 18px; }
+  .roster li { margin-bottom: 4px; }
+  .roster .empty { color: var(--muted); }
+
+  .confirm {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid #f3c9c5;
+    background: var(--err-weak);
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .confirm p { margin: 0 0 10px; }
+
+  .status { color: var(--muted); font-size: 14px; padding: 24px 0; text-align: center; }
+  .status.error { color: var(--err); }
+  .empty-box {
+    background: var(--card);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .empty-box a.btn { margin-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap head-row">
+    <div>
+      <h1><a href="./index.html">마이페이지</a></h1>
+      <p id="who">내가 올린 기회와 신청 내역을 관리합니다.</p>
+    </div>
+    <div class="head-actions" id="headActions"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="mine" aria-selected="true">내가 올린 기회</button>
+    <button role="tab" data-tab="applied" aria-selected="false">내 신청 내역</button>
+  </div>
+  <div id="panel"><p class="status">불러오는 중…</p></div>
+</main>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3Nsc3pkZ2Jkamh3cGF5b2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Mjk5MDYsImV4cCI6MjEwMjAwNTkwNn0.jGLzzUzs6bV3OqNIaVhnfLh_rUxwn0mW8BFsfCfq_A8";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let user = null;
+let tab = "mine";
+let mine = [];          // 내가 올린 기회
+let rosters = {};       // { 기회 id: [신청자] }
+let applied = [];       // 내 신청 내역 (기회 정보 포함)
+let confirmDeleteId = null;
+
+const panel = document.getElementById("panel");
+const headEl = document.getElementById("headActions");
+const whoEl = document.getElementById("who");
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  });
+}
+
+function renderHeader() {
+  if (user) {
+    const label = user.user_metadata?.name || user.email || "로그인됨";
+    whoEl.textContent = label + " 님의 활동입니다.";
+    headEl.innerHTML =
+      '<a class="btn" href="./new.html">기회 등록</a>' +
+      '<a class="btn ghost" href="./list.html">기회 목록</a>' +
+      '<button class="ghost" id="signOut">로그아웃</button>';
+    document.getElementById("signOut").addEventListener("click", function () {
+      supabase.auth.signOut();
+    });
+  } else {
+    whoEl.textContent = "내가 올린 기회와 신청 내역을 관리합니다.";
+    headEl.innerHTML = '<button id="signIn">구글로 로그인</button>';
+    document.getElementById("signIn").addEventListener("click", function () {
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: location.origin + location.pathname },
+      });
+    });
+  }
+}
+
+async function loadAll() {
+  mine = [];
+  rosters = {};
+  applied = [];
+  if (!user) return;
+
+  const { data: opps, error: oppErr } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("id", { ascending: false });
+  if (oppErr) throw oppErr;
+  mine = opps;
+
+  // RLS가 본인 신청 + 본인 소유 기회의 신청자만 내려준다.
+  // 기회 정보는 FK를 따라 함께 가져온다.
+  const { data: apps, error: appErr } = await supabase
+    .from("applications")
+    .select("id, opportunity_id, name, contact, user_id, created_at, opportunities(*)")
+    .order("created_at");
+  if (appErr) throw appErr;
+
+  const mineIds = new Set(mine.map((o) => o.id));
+  for (const row of apps) {
+    if (mineIds.has(row.opportunity_id)) {
+      (rosters[row.opportunity_id] = rosters[row.opportunity_id] || []).push(row);
+    }
+    if (row.user_id === user.id) applied.push(row);
+  }
+  applied.reverse();
+}
+
+function rosterHtml(o) {
+  const rows = rosters[o.id] || [];
+  const body = rows.length
+    ? "<ul>" + rows.map((r) => "<li>" + esc(r.name) + " — " + esc(r.contact) + "</li>").join("") + "</ul>"
+    : '<p class="empty">아직 신청자가 없습니다.</p>';
+  return '<div class="roster"><h3>신청자 ' + rows.length + "명</h3>" + body + "</div>";
+}
+
+function factsHtml(o) {
+  return (
+    "<dl>" +
+      "<dt>위치</dt><dd>" + esc(o.location) + "</dd>" +
+      "<dt>날짜</dt><dd>" + esc(o.event_date) + "</dd>" +
+      "<dt>시간</dt><dd>" + esc(o.event_time) + "</dd>" +
+      "<dt>인원</dt><dd>" + o.applied + " / " + o.needed + "명</dd>" +
+    "</dl>" +
+    (o.description ? '<p class="desc">' + esc(o.description) + "</p>" : "")
+  );
+}
+
+function mineCard(o) {
+  const full = o.applied >= o.needed;
+  const badges =
+    (o.hidden ? '<span class="badge hidden-b">숨김</span>' : "") +
+    (full ? '<span class="badge full-b">모집 완료</span>' : "");
+
+  const confirmBox =
+    confirmDeleteId === o.id
+      ? '<div class="confirm">' +
+          "<p>삭제하면 신청자 " + (rosters[o.id] || []).length + "명의 신청 내역도 함께 사라집니다. 되돌릴 수 없습니다.</p>" +
+          '<button class="danger" data-act="delete-yes" data-id="' + o.id + '">삭제합니다</button> ' +
+          '<button class="ghost" data-act="delete-no">그만두기</button>' +
+        "</div>"
+      : "";
+
+  return (
+    '<article class="card' + (o.hidden ? " dim" : "") + '">' +
+      "<h2>" + esc(o.title) + badges + "</h2>" +
+      '<p class="org">' + esc(o.org) + "</p>" +
+      factsHtml(o) +
+      '<div class="actions">' +
+        '<a class="btn ghost" href="./new.html?id=' + o.id + '">수정</a>' +
+        '<button class="ghost" data-act="toggle-hide" data-id="' + o.id + '">' +
+          (o.hidden ? "다시 공개" : "숨기기") +
+        "</button>" +
+        '<button class="danger" data-act="delete-ask" data-id="' + o.id + '">삭제</button>' +
+        '<span class="note">' + (o.hidden ? "목록에 보이지 않습니다" : "목록에 공개 중") + "</span>" +
+        '<span class="row-err" data-error="' + o.id + '"></span>' +
+      "</div>" +
+      confirmBox +
+      rosterHtml(o) +
+    "</article>"
+  );
+}
+
+function appliedCard(a) {
+  const o = a.opportunities;
+  if (!o) {
+    return (
+      '<article class="card dim">' +
+        "<h2>삭제된 기회</h2>" +
+        '<p class="org">주최자가 이 기회를 내렸습니다.</p>' +
+      "</article>"
+    );
+  }
+  return (
+    '<article class="card">' +
+      "<h2>" + esc(o.title) + (o.hidden ? '<span class="badge hidden-b">숨김</span>' : "") + "</h2>" +
+      '<p class="org">' + esc(o.org) + "</p>" +
+      factsHtml(o) +
+      '<div class="actions">' +
+        '<button class="ghost" data-act="cancel" data-id="' + o.id + '">신청 취소</button>' +
+        '<span class="note done">' + esc(a.name) + " · " + esc(a.contact) + "로 신청됨</span>" +
+        '<span class="row-err" data-error="' + o.id + '"></span>' +
+      "</div>" +
+    "</article>"
+  );
+}
+
+function render() {
+  renderHeader();
+
+  document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+  });
+
+  if (!user) {
+    panel.innerHTML =
+      '<div class="empty-box">마이페이지는 로그인 후 볼 수 있습니다.<br>' +
+      '<button id="signIn2" style="margin-top:12px">구글로 로그인</button></div>';
+    document.getElementById("signIn2").addEventListener("click", function () {
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: location.origin + location.pathname },
+      });
+    });
+    return;
+  }
+
+  if (tab === "mine") {
+    panel.innerHTML = mine.length
+      ? mine.map(mineCard).join("")
+      : '<div class="empty-box">아직 올린 기회가 없습니다.<br>' +
+        '<a class="btn" href="./new.html">첫 기회 등록하기</a></div>';
+  } else {
+    panel.innerHTML = applied.length
+      ? applied.map(appliedCard).join("")
+      : '<div class="empty-box">아직 신청한 기회가 없습니다.<br>' +
+        '<a class="btn" href="./list.html">기회 둘러보기</a></div>';
+  }
+}
+
+async function refresh() {
+  try {
+    await loadAll();
+    render();
+  } catch (err) {
+    console.error(err);
+    panel.innerHTML = '<p class="status error">불러오지 못했습니다. 새로고침해 주세요.</p>';
+  }
+}
+
+function showRowError(id, text) {
+  const el = panel.querySelector('[data-error="' + id + '"]');
+  if (el) el.textContent = text;
+}
+
+document.querySelector(".tabs").addEventListener("click", function (e) {
+  const b = e.target.closest("button[data-tab]");
+  if (!b) return;
+  tab = b.dataset.tab;
+  confirmDeleteId = null;
+  render();
+});
+
+panel.addEventListener("click", async function (e) {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const id = Number(btn.dataset.id);
+
+  if (act === "delete-ask") {
+    confirmDeleteId = id;
+    render();
+    return;
+  }
+  if (act === "delete-no") {
+    confirmDeleteId = null;
+    render();
+    return;
+  }
+
+  if (act === "toggle-hide") {
+    const target = mine.find((o) => o.id === id);
+    if (!target) return;
+    btn.disabled = true;
+    btn.textContent = "처리 중…";
+    const { error } = await supabase.rpc("set_opportunity_hidden", {
+      p_id: id,
+      p_hidden: !target.hidden,
+    });
+    if (error) {
+      console.error(error);
+      render();
+      showRowError(id, "처리하지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    await refresh();
+    return;
+  }
+
+  if (act === "delete-yes") {
+    btn.disabled = true;
+    btn.textContent = "삭제 중…";
+    const { error } = await supabase.rpc("delete_opportunity", { p_id: id });
+    if (error) {
+      console.error(error);
+      confirmDeleteId = null;
+      render();
+      showRowError(id, "삭제하지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    confirmDeleteId = null;
+    await refresh();
+    return;
+  }
+
+  if (act === "cancel") {
+    btn.disabled = true;
+    btn.textContent = "취소 중…";
+    const { error } = await supabase.rpc("cancel_application", { opp_id: id });
+    if (error) {
+      console.error(error);
+      render();
+      showRowError(id, "취소하지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    await refresh();
+  }
+});
+
+supabase.auth.onAuthStateChange(function (_event, session) {
+  user = session?.user || null;
+  confirmDeleteId = null;
+  refresh();
+});
+
+const { data: sessionData } = await supabase.auth.getSession();
+user = sessionData.session?.user || null;
+await refresh();
+</script>
+</body>
+</html>

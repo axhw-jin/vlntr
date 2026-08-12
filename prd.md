@@ -42,12 +42,18 @@
   - `index.html` — 랜딩 페이지. 서비스 소개, 사용 흐름 4단계, 역할별 진입점.
     현재 열린 기회 수·남은 자리는 실제 DB에서 읽어 표시
   - `list.html` — 기회 목록 + 신청 폼 + (소유자에게) 신청자 명단
-  - `new.html` — 기회 등록 폼 (로그인 전에는 잠김)
+  - `new.html` — 기회 등록 폼. `?id=` 를 붙이면 같은 폼이 수정 모드로 동작 (로그인 전에는 잠김)
+  - `mypage.html` — 마이페이지. 탭 두 개
+    - 내가 올린 기회: 수정 / 숨기기·다시 공개 / 삭제 + 신청자 명단
+    - 내 신청 내역: 신청 정보 확인 + 신청 취소
 - 데이터: Supabase (프로젝트 `cpkslszdgbdjhwpayocy`)
-  - `opportunities` — 봉사 기회. 읽기는 누구나, 수정·삭제는 `owner_id` 본인만
-  - `applications` — 신청자 이름·연락처. 본인 신청 + 본인이 올린 기회의 신청자만 조회 가능
-  - `create_opportunity()` / `apply_to_opportunity()` / `cancel_application()`
-    — 모두 `auth.uid()` 확인. 로그아웃 상태(anon)에서는 실행 권한 없음
+  - `opportunities` — 봉사 기회. `description`(상세 설명), `hidden`(숨김) 포함.
+    읽기는 누구나지만 `hidden`인 글은 소유자에게만 보임. 수정·삭제는 `owner_id` 본인만
+  - `applications` — 신청자 이름·연락처. 본인 신청 + 본인이 올린 기회의 신청자만 조회 가능.
+    기회가 삭제되면 신청도 함께 삭제됨(FK cascade)
+  - `create_opportunity()` / `update_opportunity()` / `set_opportunity_hidden()` /
+    `delete_opportunity()` / `apply_to_opportunity()` / `cancel_application()`
+    — 모두 `auth.uid()` 확인, 수정 계열은 소유자까지 확인. 로그아웃 상태(anon)에서는 실행 권한 없음
 - 배포: Vercel + GitHub(`hwax-js/vlntr`) 연동. main에 push하면 자동 배포
 
 ## 다음 순서 (로드맵)
@@ -57,6 +63,5 @@
 
 ## 알려진 이슈
 
-- 오류 시 `alert()`이 페이지를 블로킹함 (수정 보류 중)
-- 등록한 글을 수정·삭제하는 화면이 아직 없음 (DB 권한은 이미 소유자로 제한됨)
+- 오류 시 `alert()`이 페이지를 블로킹함 (수정 보류 중, `list.html` 취소 경로 1곳)
 - 초기 시드 4건은 `owner_id`가 없어 명단을 볼 주인이 없음
