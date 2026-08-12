@@ -82,7 +82,12 @@
 </header>
 
 <main class="wrap">
-  <form class="card" id="form">
+  <div class="card" id="gate" hidden>
+    <p style="margin:0 0 14px">기회를 등록하려면 로그인이 필요합니다.</p>
+    <button type="button" id="signIn">구글로 로그인</button>
+  </div>
+
+  <form class="card" id="form" hidden>
     <label>
       <span>활동 이름</span>
       <input name="title" maxlength="80" placeholder="예: 지역 아동센터 학습 멘토링" required>
@@ -125,11 +130,16 @@
   </form>
 </main>
 
-<script>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3Nsc3pkZ2Jkamh3cGF5b2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Mjk5MDYsImV4cCI6MjEwMjAwNTkwNn0.jGLzzUzs6bV3OqNIaVhnfLh_rUxwn0mW8BFsfCfq_A8";
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const gate = document.getElementById("gate");
 const form = document.getElementById("form");
 const msgEl = document.getElementById("msg");
 const submitBtn = form.querySelector('button[type="submit"]');
@@ -160,40 +170,53 @@ form.addEventListener("submit", async function (e) {
   submitBtn.disabled = true;
   submitBtn.textContent = "등록 중…";
 
-  try {
-    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/create_opportunity", {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: "Bearer " + SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        p_title: f.title.value.trim(),
-        p_org: f.org.value.trim(),
-        p_location: f.location.value.trim(),
-        p_event_date: formatDate(f.date.value),
-        p_event_time: start + " ~ " + end,
-        p_needed: Number(f.needed.value),
-      }),
-    });
+  const { error } = await supabase.rpc("create_opportunity", {
+    p_title: f.title.value.trim(),
+    p_org: f.org.value.trim(),
+    p_location: f.location.value.trim(),
+    p_event_date: formatDate(f.date.value),
+    p_event_time: start + " ~ " + end,
+    p_needed: Number(f.needed.value),
+  });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "등록 실패");
-
-    msgEl.className = "msg ok";
-    msgEl.textContent = "등록되었습니다. 목록으로 이동합니다…";
-    setTimeout(function () {
-      location.href = "./index.html";
-    }, 900);
-  } catch (err) {
-    console.error(err);
+  if (error) {
+    console.error(error);
     submitBtn.disabled = false;
     submitBtn.textContent = "등록하기";
     msgEl.className = "msg error";
-    msgEl.textContent = "등록에 실패했습니다. 입력을 확인하고 다시 시도해 주세요.";
+    msgEl.textContent =
+      error.message === "login required"
+        ? "로그인이 필요합니다. 다시 로그인해 주세요."
+        : "등록에 실패했습니다. 입력을 확인하고 다시 시도해 주세요.";
+    return;
   }
+
+  msgEl.className = "msg ok";
+  msgEl.textContent = "등록되었습니다. 목록으로 이동합니다…";
+  setTimeout(function () {
+    location.href = "./index.html";
+  }, 900);
 });
+
+document.getElementById("signIn").addEventListener("click", function () {
+  supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + location.pathname },
+  });
+});
+
+function applySession(session) {
+  const loggedIn = Boolean(session?.user);
+  form.hidden = !loggedIn;
+  gate.hidden = loggedIn;
+}
+
+supabase.auth.onAuthStateChange(function (_event, session) {
+  applySession(session);
+});
+
+const { data } = await supabase.auth.getSession();
+applySession(data.session);
 </script>
 </body>
 </html>
