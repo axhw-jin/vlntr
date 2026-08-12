@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vlntr — 봉사 기회 참여 신청</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #16181d;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #2563eb;
+    --ok: #0f7b4f;
+    --ok-weak: #e6f4ed;
+    --err: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, "Malgun Gothic", sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 20px 16px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  main { padding: 20px 16px 60px; }
+  .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 17px; }
+  .org { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; row-gap: 6px; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; }
+  .actions { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
+  button {
+    font: inherit;
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:disabled { cursor: not-allowed; }
+  button.applied { background: var(--ok-weak); color: var(--ok); }
+  button.full { background: var(--line); color: var(--muted); }
+  .note { font-size: 13px; color: var(--muted); }
+  .note.done { color: var(--ok); }
+  .apply-form {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: 8px;
+  }
+  .apply-form input {
+    font: inherit;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+  }
+  .apply-form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .apply-form .row { display: flex; align-items: center; gap: 10px; }
+  .form-error { font-size: 13px; color: var(--err); }
+  button.ghost { background: transparent; color: var(--muted); padding: 9px 8px; }
+  .status { color: var(--muted); font-size: 14px; padding: 24px 0; text-align: center; }
+  .status.error { color: var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>vlntr</h1>
+    <p>봉사 기회를 확인하고 참여를 신청하세요.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="count" id="count"></p>
+  <div id="list"><p class="status">불러오는 중…</p></div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3Nsc3pkZ2Jkamh3cGF5b2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Mjk5MDYsImV4cCI6MjEwMjAwNTkwNn0.jGLzzUzs6bV3OqNIaVhnfLh_rUxwn0mW8BFsfCfq_A8";
+
+const HEADERS = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: "Bearer " + SUPABASE_ANON_KEY,
+  "Content-Type": "application/json",
+};
+
+// 내 신청 내역 — 로그인이 없으므로 { 기회 id: 신청 토큰 } 형태로 브라우저에 보관.
+// 이 토큰이 있어야 취소할 수 있다.
+const MY_KEY = "vlntr:applications";
+let myApplications = {};
+try {
+  myApplications = JSON.parse(localStorage.getItem(MY_KEY) || "{}");
+} catch (e) {
+  myApplications = {};
+}
+function saveMine() {
+  localStorage.setItem(MY_KEY, JSON.stringify(myApplications));
+}
+
+// 신청 폼이 열려 있는 기회 id
+let openFormFor = null;
+
+let posts = [];
+const listEl = document.getElementById("list");
+const countEl = document.getElementById("count");
+
+async function loadPosts() {
+  const res = await fetch(
+    SUPABASE_URL + "/rest/v1/opportunities?select=*&order=id",
+    { headers: HEADERS }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  posts = await res.json();
+}
+
+// 신청/취소는 서버 함수로 처리한다.
+// 신청자 정보 저장과 인원 수 갱신이 한 트랜잭션에서 일어나고, 정원 초과도 서버가 막는다.
+async function callRpc(fn, body) {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: HEADERS,
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = new Error(data.message || "RPC 실패");
+    err.code = data.code;
+    throw err;
+  }
+  return Array.isArray(data) ? data[0] : data;
+}
+
+function render() {
+  countEl.textContent = "모집 중인 기회 " + posts.length + "건";
+  listEl.innerHTML = posts.map(card).join("");
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  });
+}
+
+function card(p) {
+  const mine = Boolean(myApplications[p.id]);
+  const full = !mine && p.applied >= p.needed;
+
+  let btn;
+  if (mine) {
+    btn = '<button class="applied" data-act="cancel" data-id="' + p.id + '">신청 완료 · 취소하기</button>';
+  } else if (full) {
+    btn = '<button class="full" disabled>모집 마감</button>';
+  } else {
+    btn = '<button data-act="open" data-id="' + p.id + '">참여 신청</button>';
+  }
+  const note = mine
+    ? '<span class="note done">신청되었습니다. 기관에서 연락드립니다.</span>'
+    : '<span class="note">' + p.applied + " / " + p.needed + "명 신청</span>";
+
+  // 신청 폼이 열린 카드에서는 버튼 대신 이름·연락처 입력을 보여준다
+  const body =
+    openFormFor === p.id
+      ? '<form class="apply-form" data-id="' + p.id + '">' +
+          '<input name="name" placeholder="이름" maxlength="50" autocomplete="name" required>' +
+          '<input name="contact" placeholder="연락처 (전화번호 또는 이메일)" maxlength="100" required>' +
+          '<div class="row">' +
+            "<button type=\"submit\">신청하기</button>" +
+            '<button type="button" class="ghost" data-act="close" data-id="' + p.id + '">취소</button>' +
+            '<span class="form-error" data-error="' + p.id + '"></span>' +
+          "</div>" +
+        "</form>"
+      : '<div class="actions">' + btn + note + "</div>";
+
+  return (
+    '<article class="card">' +
+      "<h2>" + esc(p.title) + "</h2>" +
+      '<p class="org">' + esc(p.org) + "</p>" +
+      "<dl>" +
+        "<dt>위치</dt><dd>" + esc(p.location) + "</dd>" +
+        "<dt>날짜</dt><dd>" + esc(p.event_date) + "</dd>" +
+        "<dt>시간</dt><dd>" + esc(p.event_time) + "</dd>" +
+        "<dt>인원</dt><dd>" + p.needed + "명 모집</dd>" +
+      "</dl>" +
+      body +
+    "</article>"
+  );
+}
+
+function setApplied(id, applied) {
+  posts = posts.map(function (p) {
+    return p.id === id ? Object.assign({}, p, { applied: applied }) : p;
+  });
+}
+
+listEl.addEventListener("click", async function (e) {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+
+  const id = Number(btn.dataset.id);
+  const act = btn.dataset.act;
+
+  if (act === "open") {
+    openFormFor = id;
+    render();
+    const input = listEl.querySelector('form[data-id="' + id + '"] input[name="name"]');
+    if (input) input.focus();
+    return;
+  }
+
+  if (act === "close") {
+    openFormFor = null;
+    render();
+    return;
+  }
+
+  if (act === "cancel") {
+    btn.disabled = true;
+    btn.textContent = "처리 중…";
+    try {
+      const result = await callRpc("cancel_application", { token: myApplications[id] });
+      delete myApplications[id];
+      saveMine();
+      setApplied(id, result.applied);
+      render();
+    } catch (err) {
+      console.error(err);
+      // 서버에 신청 기록이 없으면(이미 취소됨) 브라우저 기록만 정리한다
+      if (err.code === "P0002") {
+        delete myApplications[id];
+        saveMine();
+      } else {
+        alert("취소에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+      await refresh();
+    }
+  }
+});
+
+listEl.addEventListener("submit", async function (e) {
+  const form = e.target.closest("form.apply-form");
+  if (!form) return;
+  e.preventDefault();
+
+  const id = Number(form.dataset.id);
+  const name = form.elements.name.value.trim();
+  const contact = form.elements.contact.value.trim();
+  const errorEl = form.querySelector("[data-error]");
+  const submitBtn = form.querySelector('button[type="submit"]');
+
+  if (!name || !contact) {
+    errorEl.textContent = "이름과 연락처를 모두 입력해 주세요.";
+    return;
+  }
+
+  errorEl.textContent = "";
+  submitBtn.disabled = true;
+  submitBtn.textContent = "신청 중…";
+
+  try {
+    const result = await callRpc("apply_to_opportunity", {
+      opp_id: id,
+      applicant_name: name,
+      applicant_contact: contact,
+    });
+    myApplications[id] = result.application_id;
+    saveMine();
+    setApplied(id, result.applied);
+    openFormFor = null;
+    render();
+  } catch (err) {
+    console.error(err);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "신청하기";
+    errorEl.textContent =
+      err.code === "P0001"
+        ? "모집이 마감되었습니다."
+        : "신청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+});
+
+async function refresh() {
+  try {
+    await loadPosts();
+    render();
+  } catch (err) {
+    console.error(err);
+    listEl.innerHTML =
+      '<p class="status error">기회를 불러오지 못했습니다. 새로고침해 주세요.</p>';
+    countEl.textContent = "";
+  }
+}
+
+refresh();
+</script>
+</body>
+</html>
