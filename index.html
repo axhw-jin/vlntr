@@ -27,7 +27,8 @@
     font-family: system-ui, "Malgun Gothic", sans-serif;
     line-height: 1.55;
   }
-  .wrap { max-width: 720px; margin: 0 auto; }
+  /* 헤더·히어로·본문·푸터가 같은 좌측 기준선을 쓰도록 폭을 통일한다 */
+  .wrap { max-width: 1040px; margin: 0 auto; }
 
   header {
     background: var(--card);
@@ -70,8 +71,6 @@
     padding: 56px 16px 64px;
   }
   .hero-grid {
-    max-width: 1040px;
-    margin: 0 auto;
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
@@ -197,7 +196,7 @@
   .card h3 { margin: 0 0 4px; font-size: 15px; }
   .card p { margin: 0; font-size: 14px; color: var(--muted); }
 
-  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; max-width: 620px; }
   ol.steps li {
     counter-increment: step;
     position: relative;
@@ -262,7 +261,7 @@
 </header>
 
 <div class="hero">
-  <div class="hero-grid">
+  <div class="wrap hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">봉사 기회 매칭</span>
       <h1>봉사할 사람과<br>봉사할 곳을 잇습니다.</h1>
