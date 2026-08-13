@@ -211,11 +211,11 @@ function renderHeader() {
   }
 }
 
+// 전역 상태에 직접 push하면, 로그인 직후처럼 refresh()가 겹쳐 실행될 때
+// 같은 신청이 실행 횟수만큼 쌓인다. 결과를 지역 변수에 모아 통째로 돌려준다.
 async function loadAll() {
-  mine = [];
-  rosters = {};
-  applied = [];
-  if (!user) return;
+  const next = { mine: [], rosters: {}, applied: [] };
+  if (!user) return next;
 
   const { data: opps, error: oppErr } = await supabase
     .from("opportunities")
@@ -223,7 +223,7 @@ async function loadAll() {
     .eq("owner_id", user.id)
     .order("id", { ascending: false });
   if (oppErr) throw oppErr;
-  mine = opps;
+  next.mine = opps;
 
   // RLS가 본인 신청 + 본인 소유 기회의 신청자만 내려준다.
   // 기회 정보는 FK를 따라 함께 가져온다.
@@ -233,14 +233,15 @@ async function loadAll() {
     .order("created_at");
   if (appErr) throw appErr;
 
-  const mineIds = new Set(mine.map((o) => o.id));
+  const mineIds = new Set(next.mine.map((o) => o.id));
   for (const row of apps) {
     if (mineIds.has(row.opportunity_id)) {
-      (rosters[row.opportunity_id] = rosters[row.opportunity_id] || []).push(row);
+      (next.rosters[row.opportunity_id] = next.rosters[row.opportunity_id] || []).push(row);
     }
-    if (row.user_id === user.id) applied.push(row);
+    if (row.user_id === user.id) next.applied.push(row);
   }
-  applied.reverse();
+  next.applied.reverse();
+  return next;
 }
 
 function rosterHtml(o) {
@@ -355,12 +356,21 @@ function render() {
   }
 }
 
+// 겹쳐 실행돼도 마지막 요청의 결과만 화면에 반영한다
+let loadSeq = 0;
+
 async function refresh() {
+  const seq = ++loadSeq;
   try {
-    await loadAll();
+    const next = await loadAll();
+    if (seq !== loadSeq) return; // 더 최신 요청이 진행 중이면 이 결과는 버린다
+    mine = next.mine;
+    rosters = next.rosters;
+    applied = next.applied;
     render();
   } catch (err) {
     console.error(err);
+    if (seq !== loadSeq) return;
     panel.innerHTML = '<p class="status error">불러오지 못했습니다. 새로고침해 주세요.</p>';
   }
 }
