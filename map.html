@@ -136,10 +136,13 @@
   }
   .npin-wrap.on .npin { width: 20px; height: 20px; }
   /* 네이버 말풍선은 내용 크기대로 감싸는 상자라, 폭을 못 정하면
-     글자가 한 줄에 한 자씩 떨어진다. 그래서 폭을 직접 지정한다. */
+     글자가 한 줄에 한 자씩 떨어진다. 그래서 폭을 직접 지정한다.
+     또 상자의 왼쪽 위가 핀 좌표에 붙어 핀을 가리므로,
+     스스로 왼쪽·위로 물러나 핀 바로 위에 뜨게 한다. */
   .nwin {
     box-sizing: border-box;
     width: 250px;
+    transform: translate(-50%, calc(-100% - 6px));
     background: var(--card);
     color: var(--text);
     border: 1px solid var(--line);
@@ -369,12 +372,15 @@ function naverAdapter(onSelect) {
 
   let items = [];
   let overlays = {};
+  // disableAnchor를 켜면 상자의 왼쪽 위가 좌표에 붙어 핀을 가린다.
+  // 기본 앵커를 쓰면 핀 바로 위에 가운데로 뜬다. 꼬리는 배경을 없애 감춘다.
   const info = new nm.InfoWindow({
     content: "",
     borderWidth: 0,
     backgroundColor: "transparent",
-    disableAnchor: true,
-    pixelOffset: new nm.Point(0, -16),
+    anchorSize: new nm.Size(0, 12),
+    anchorSkew: false,
+    anchorColor: "transparent",
   });
   // 말풍선은 지도 위에 그려지는 그냥 HTML이라 닫기 버튼을 직접 연결해야 한다
   mapEl.addEventListener("click", function (e) {
