@@ -103,6 +103,7 @@
 
   /* 지도 위 요소도 테마를 따라가게 */
   .leaflet-container { background: var(--bg); font: inherit; }
+  .leaflet-tile-pane { filter: var(--map-dim, none); }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background: var(--card);
     color: var(--text);
@@ -242,18 +243,10 @@ function renderHeader() {
 }
 
 // ── 지도 ────────────────────────────────────────────────
-// 기본 OSM 타일은 색이 많아 산만해서, 도로·지명만 남은 납작한 베이스맵을 쓴다.
-// 다크는 필터로 반전시키지 않고 전용 다크 타일로 바꾼다. 둘 다 키가 필요 없다.
-const TILES = {
-  light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-};
-const TILE_OPTS = {
-  maxZoom: 19,
-  subdomains: "abcd",
-  attribution:
-    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
-};
+// Carto Voyager. 도로·물·공원 색은 남기고 잡다한 표시는 뺀 지도라
+// 깔끔하면서도 지형이 읽힌다. 확대하면 지명이 한글로 나온다. 키는 필요 없다.
+// 다크에서는 전용 다크 타일(거의 검정)로 바꾸는 대신 밝기만 낮춘다 — theme.css의 --map-dim.
+const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
 const map = L.map("map", {
   scrollWheelZoom: false,
@@ -261,19 +254,12 @@ const map = L.map("map", {
 }).setView(SEOUL, 11);
 L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
 
-function isDark() {
-  const set = document.documentElement.getAttribute("data-theme");
-  if (set) return set === "dark";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-let tiles = L.tileLayer(TILES[isDark() ? "dark" : "light"], TILE_OPTS).addTo(map);
-
-function swapTiles() {
-  const next = L.tileLayer(TILES[isDark() ? "dark" : "light"], TILE_OPTS).addTo(map);
-  // 새 타일이 다 그려진 뒤에 옛것을 걷어내야 중간에 빈 화면이 보이지 않는다
-  next.once("load", function () { tiles.remove(); tiles = next; });
-}
+L.tileLayer(TILE_URL, {
+  maxZoom: 19,
+  subdomains: "abcd",
+  attribution:
+    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+}).addTo(map);
 // 스크롤로 페이지를 내리다 지도가 확대되는 일이 없도록, 클릭한 뒤에만 휠 확대를 켠다
 map.on("click", function () { map.scrollWheelZoom.enable(); });
 map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
@@ -394,13 +380,12 @@ function markerStyle(isSelected) {
   };
 }
 
-// 테마를 바꾸면 타일과 핀 색을 같이 맞춘다
-// (핀 색은 그릴 때 계산해 둔 값이라 자동으로 안 바뀐다)
+// 타일 밝기는 CSS가 알아서 따라가지만, 핀 색은 그릴 때 계산해 둔 값이라
+// 테마가 바뀌면 다시 칠해줘야 한다.
 function applyTheme() {
   Object.keys(markers).forEach(function (id) {
     markers[id].setStyle(markerStyle(Number(id) === selected));
   });
-  swapTiles();
 }
 new MutationObserver(applyTheme).observe(document.documentElement, {
   attributes: true,
