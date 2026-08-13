@@ -46,6 +46,9 @@
   - `mypage.html` — 마이페이지. 탭 두 개
     - 내가 올린 기회: 수정 / 숨기기·다시 공개 / 삭제 + 신청자 명단
     - 내 신청 내역: 신청 정보 확인 + 신청 취소
+  - `theme.css` / `theme.js` — 네 화면이 공유하는 색 토큰과 라이트/다크 전환.
+    처음에는 OS 설정(`prefers-color-scheme`)을 따르고, 헤더의 해·달 버튼으로 바꾸면
+    그 선택을 `localStorage`에 저장해 이후 모든 화면에 적용한다
 - 데이터: Supabase (프로젝트 `cpkslszdgbdjhwpayocy`)
   - `opportunities` — 봉사 기회. `description`(상세 설명), `hidden`(숨김) 포함.
     읽기는 누구나지만 `hidden`인 글은 소유자에게만 보임. 수정·삭제는 `owner_id` 본인만

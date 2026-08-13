@@ -8,17 +8,9 @@
 <meta property="og:title" content="vlntr — 봉사 기회 매칭">
 <meta property="og:description" content="봉사 활동을 구하는 사람과 참여하는 사람을 잇습니다.">
 <meta property="og:type" content="website">
+<link rel="stylesheet" href="./theme.css">
+<script src="./theme.js"></script>
 <style>
-  :root {
-    --bg: #f6f7f9;
-    --card: #ffffff;
-    --text: #16181d;
-    --muted: #6b7280;
-    --line: #e3e6ea;
-    --accent: #2563eb;
-    --accent-weak: #eaf0fe;
-    --ok: #0f7b4f;
-  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -37,7 +29,9 @@
   }
   .head-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
   .brand { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-  .head-actions { flex: none; display: flex; align-items: center; gap: 10px; }
+  /* 로그인 상태에서는 버튼이 많아지므로, 좁은 화면에서 줄바꿈되도록
+     flex:none 대신 줄어들 수 있게 둔다 */
+  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
   .who { font-size: 13px; color: var(--muted); }
 
   a.btn, button {
@@ -47,7 +41,7 @@
     border-radius: 8px;
     border: 0;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-fg);
     text-decoration: none;
     cursor: pointer;
     display: inline-block;
@@ -142,7 +136,7 @@
     border: 1px solid var(--line);
     border-radius: 18px;
     padding: 8px;
-    box-shadow: 0 12px 28px rgba(16, 24, 40, 0.1);
+    box-shadow: 0 12px 28px var(--shadow);
     animation: pop 0.5s ease-out both;
   }
   .collage img {
@@ -152,15 +146,16 @@
     border-radius: 12px;
     object-fit: cover;
     background: var(--bg);
+    filter: var(--img-dim);
   }
   .shot-1 { top: 0; left: 50%; transform: translateX(-50%); width: 250px; height: 250px; animation-delay: 0.2s; }
   .shot-2 { top: 33%; right: 0; width: 215px; height: 215px; animation-delay: 0.4s; }
   .shot-3 { bottom: 0; left: 0; width: 190px; height: 190px; animation-delay: 0.6s; }
 
   .blob { position: absolute; border-radius: 999px; animation: float 3s ease-in-out infinite; }
-  .blob-1 { top: -14px; left: 24%; width: 64px; height: 64px; background: rgba(191, 219, 254, 0.6); }
-  .blob-2 { bottom: 6%; right: 26%; width: 48px; height: 48px; border-radius: 12px; background: rgba(221, 214, 254, 0.65); animation-delay: 0.5s; }
-  .blob-3 { top: 24%; left: 8%; width: 28px; height: 28px; background: rgba(167, 243, 208, 0.85); animation-delay: 1s; }
+  .blob-1 { top: -14px; left: 24%; width: 64px; height: 64px; background: var(--blob-a); }
+  .blob-2 { bottom: 6%; right: 26%; width: 48px; height: 48px; border-radius: 12px; background: var(--blob-b); animation-delay: 0.5s; }
+  .blob-3 { top: 24%; left: 8%; width: 28px; height: 28px; background: var(--blob-c); animation-delay: 1s; }
 
   @media (max-width: 860px) {
     .hero { padding: 40px 16px 48px; }
@@ -280,7 +275,10 @@
 <header>
   <div class="wrap head-row">
     <span class="brand">vlntr</span>
-    <div class="head-actions" id="headActions"></div>
+    <div class="head-actions">
+      <span class="head-slot" id="headActions"></span>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
+    </div>
   </div>
 </header>
 

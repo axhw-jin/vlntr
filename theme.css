@@ -1,0 +1,130 @@
+/* 모든 페이지가 공유하는 색 토큰.
+   기본은 라이트. 사용자가 직접 고르면 <html data-theme="dark|light">가 붙고,
+   고른 적이 없으면(속성 없음) OS 설정(prefers-color-scheme)을 따른다. */
+:root {
+  color-scheme: light;
+
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --dim: #fbfbfc;      /* 숨김 처리된 카드 등 한 톤 죽인 면 */
+  --field: #ffffff;    /* 입력창 배경 */
+  --text: #16181d;
+  --muted: #6b7280;
+  --line: #e3e6ea;
+
+  --accent: #2563eb;
+  --accent-weak: #eaf0fe;
+  --accent-fg: #ffffff; /* accent 배경 위 글자색 */
+
+  --ok: #0f7b4f;
+  --ok-weak: #e6f4ed;
+  --ok-line: #cde9dc;
+
+  --err: #b42318;
+  --err-weak: #fdeceb;
+  --err-line: #f3c9c5;
+
+  --warn: #92400e;
+  --warn-weak: #fef3c7;
+  --warn-line: #fde68a;
+
+  --shadow: rgba(16, 24, 40, 0.1);
+  --img-dim: none;   /* 다크에서 사진이 너무 튀지 않게 */
+  --blob-a: rgba(191, 219, 254, 0.6);
+  --blob-b: rgba(221, 214, 254, 0.65);
+  --blob-c: rgba(167, 243, 208, 0.85);
+}
+
+/* 직접 고른 다크 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e1116;
+  --card: #161a21;
+  --dim: #12161c;
+  --field: #10141a;
+  --text: #e6e9ee;
+  --muted: #9aa4b2;
+  --line: #2a3039;
+
+  --accent: #6ea8fe;
+  --accent-weak: #1a2438;
+  --accent-fg: #0b1220;
+
+  --ok: #56d597;
+  --ok-weak: #14301f;
+  --ok-line: #23573c;
+
+  --err: #f79b95;
+  --err-weak: #2f1a19;
+  --err-line: #5a2f2c;
+
+  --warn: #f5c65a;
+  --warn-weak: #33280f;
+  --warn-line: #5a4718;
+
+  --shadow: rgba(0, 0, 0, 0.5);
+  --img-dim: brightness(0.86) saturate(0.95);
+  --blob-a: rgba(59, 91, 145, 0.45);
+  --blob-b: rgba(88, 76, 140, 0.45);
+  --blob-c: rgba(53, 116, 92, 0.5);
+}
+
+/* 고른 적이 없을 때의 OS 다크 — 값은 위와 동일 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0e1116;
+    --card: #161a21;
+    --dim: #12161c;
+    --field: #10141a;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --line: #2a3039;
+
+    --accent: #6ea8fe;
+    --accent-weak: #1a2438;
+    --accent-fg: #0b1220;
+
+    --ok: #56d597;
+    --ok-weak: #14301f;
+    --ok-line: #23573c;
+
+    --err: #f79b95;
+    --err-weak: #2f1a19;
+    --err-line: #5a2f2c;
+
+    --warn: #f5c65a;
+    --warn-weak: #33280f;
+    --warn-line: #5a4718;
+
+    --shadow: rgba(0, 0, 0, 0.5);
+    --img-dim: brightness(0.86) saturate(0.95);
+    --blob-a: rgba(59, 91, 145, 0.45);
+    --blob-b: rgba(88, 76, 140, 0.45);
+    --blob-c: rgba(53, 116, 92, 0.5);
+  }
+}
+
+/* 테마 전환 버튼.
+   각 페이지의 인라인 <style>이 뒤에 오므로, 우선순위를 확보하려고
+   button.theme-toggle 처럼 요소+클래스로 적는다. */
+button.theme-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.theme-toggle:hover { color: var(--text); }
+button.theme-toggle svg { width: 18px; height: 18px; }
+
+/* 헤더의 JS 렌더 영역이 flex 정렬에 그대로 참여하도록 */
+.head-slot { display: contents; }

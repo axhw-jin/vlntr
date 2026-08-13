@@ -4,19 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vlntr — 마이페이지</title>
+<link rel="stylesheet" href="./theme.css">
+<script src="./theme.js"></script>
 <style>
-  :root {
-    --bg: #f6f7f9;
-    --card: #ffffff;
-    --text: #16181d;
-    --muted: #6b7280;
-    --line: #e3e6ea;
-    --accent: #2563eb;
-    --ok: #0f7b4f;
-    --ok-weak: #e6f4ed;
-    --err: #b42318;
-    --err-weak: #fdeceb;
-  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -35,7 +25,9 @@
   h1 a { color: inherit; text-decoration: none; }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
   .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-  .head-actions { flex: none; display: flex; align-items: center; gap: 10px; }
+  /* 로그인 상태에서는 버튼이 많아지므로, 좁은 화면에서 줄바꿈되도록
+     flex:none 대신 줄어들 수 있게 둔다 */
+  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
@@ -46,7 +38,7 @@
     border-radius: 8px;
     border: 0;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-fg);
     text-decoration: none;
     cursor: pointer;
     display: inline-block;
@@ -58,7 +50,7 @@
     color: var(--muted);
     border: 1px solid var(--line);
   }
-  button.danger { background: transparent; color: var(--err); border: 1px solid #f3c9c5; }
+  button.danger { background: transparent; color: var(--err); border: 1px solid var(--err-line); }
 
   main { padding: 20px 16px 60px; }
 
@@ -70,7 +62,7 @@
   }
   .tabs button[aria-selected="true"] {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-fg);
     border-color: var(--accent);
   }
 
@@ -81,7 +73,7 @@
     padding: 16px;
     margin-bottom: 12px;
   }
-  .card.dim { background: #fbfbfc; }
+  .card.dim { background: var(--dim); }
   .card h2 { margin: 0 0 4px; font-size: 17px; }
   .org { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
   .badge {
@@ -95,8 +87,8 @@
     background: var(--bg);
     border: 1px solid var(--line);
   }
-  .badge.hidden-b { color: #92400e; background: #fef3c7; border-color: #fde68a; }
-  .badge.full-b { color: var(--ok); background: var(--ok-weak); border-color: #cde9dc; }
+  .badge.hidden-b { color: var(--warn); background: var(--warn-weak); border-color: var(--warn-line); }
+  .badge.full-b { color: var(--ok); background: var(--ok-weak); border-color: var(--ok-line); }
   dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; row-gap: 6px; font-size: 14px; }
   dt { color: var(--muted); }
   dd { margin: 0; }
@@ -127,7 +119,7 @@
   .confirm {
     margin-top: 14px;
     padding: 12px;
-    border: 1px solid #f3c9c5;
+    border: 1px solid var(--err-line);
     background: var(--err-weak);
     border-radius: 10px;
     font-size: 14px;
@@ -155,7 +147,10 @@
       <h1><a href="./index.html">마이페이지</a></h1>
       <p id="who">내가 올린 기회와 신청 내역을 관리합니다.</p>
     </div>
-    <div class="head-actions" id="headActions"></div>
+    <div class="head-actions">
+      <span class="head-slot" id="headActions"></span>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
+    </div>
   </div>
 </header>
 
