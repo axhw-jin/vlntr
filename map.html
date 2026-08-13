@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vlntr — 봉사 기회 지도</title>
+<link rel="stylesheet" href="./theme.css">
+<script src="./theme.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, "Malgun Gothic", sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 20px 16px;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
+  .who { font-size: 13px; color: var(--muted); }
+  a.home { color: inherit; text-decoration: none; }
+  a.home:hover { color: var(--accent); }
+
+  a.btn, button {
+    font: inherit;
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--accent);
+    color: var(--accent-fg);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  a.btn:hover, button:hover:not(:disabled) { filter: brightness(1.08); }
+  a.btn.ghost, button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+
+  main { padding: 16px; }
+
+  .toolbar {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 12px; font-size: 14px; color: var(--muted);
+  }
+  .toolbar a { color: var(--accent); text-decoration: none; }
+  .toolbar a:hover { text-decoration: underline; }
+
+  /* 왼쪽 목록 + 오른쪽 지도. 지도는 높이가 있어야 그려진다. */
+  .split {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+    height: calc(100vh - 190px);
+    min-height: 440px;
+  }
+  .side { overflow-y: auto; padding-right: 4px; }
+  #map {
+    height: 100%;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+  }
+
+  .pin {
+    width: 100%;
+    text-align: left;
+    display: block;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .pin:hover:not(:disabled) { filter: none; border-color: var(--accent); }
+  .pin[aria-current="true"] { border-color: var(--accent); background: var(--accent-weak); }
+  .pin b, .pin span { display: block; }
+  .pin b { font-size: 15px; font-weight: 600; }
+  .pin .org { color: var(--muted); font-size: 13px; }
+  .pin .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .pin .seat { color: var(--accent); font-size: 13px; font-weight: 600; }
+  .pin.off { opacity: 0.62; cursor: default; }
+  .pin.off:hover { border-color: var(--line); }
+
+  .side h2 { margin: 18px 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .status { color: var(--muted); font-size: 14px; padding: 16px 0; }
+  .status.error { color: var(--err); }
+
+  /* 지도 위 요소도 테마를 따라가게 */
+  .leaflet-tile-pane { filter: var(--tile-filter, none); }
+  .leaflet-container { background: var(--bg); font: inherit; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: var(--card);
+    color: var(--text);
+    box-shadow: 0 6px 20px var(--shadow);
+  }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 14px; line-height: 1.5; }
+  .leaflet-popup-content b { font-size: 15px; }
+  .leaflet-popup-content .org { color: var(--muted); font-size: 13px; }
+  .leaflet-popup-content dl { margin: 8px 0 10px; display: grid; grid-template-columns: 40px 1fr; row-gap: 3px; font-size: 13px; }
+  .leaflet-popup-content dt { color: var(--muted); }
+  .leaflet-popup-content dd { margin: 0; }
+  .leaflet-popup-content a.btn { font-size: 13px; padding: 7px 12px; display: inline-block; }
+  .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
+  .leaflet-bar a, .leaflet-bar a:hover {
+    background: var(--card); color: var(--text); border-bottom-color: var(--line);
+  }
+  .leaflet-control-attribution {
+    background: var(--card); color: var(--muted);
+  }
+  .leaflet-control-attribution a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .split {
+      grid-template-columns: 1fr;
+      height: auto;
+      min-height: 0;
+    }
+    #map { height: 46vh; min-height: 300px; order: -1; }
+    .side { overflow: visible; max-height: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap head-row">
+    <div>
+      <h1><a class="home" href="./index.html">vlntr</a></h1>
+      <p>봉사 기회를 지도에서 확인하세요.</p>
+    </div>
+    <div class="head-actions">
+      <span class="head-slot" id="headActions"></span>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="toolbar">
+    <span id="count">불러오는 중…</span>
+    <a href="./list.html">목록으로 보기</a>
+  </p>
+  <div class="split">
+    <div class="side">
+      <div id="pins"></div>
+      <div id="unmapped"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3Nsc3pkZ2Jkamh3cGF5b2N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Mjk5MDYsImV4cCI6MjEwMjAwNTkwNn0.jGLzzUzs6bV3OqNIaVhnfLh_rUxwn0mW8BFsfCfq_A8";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const SEOUL = [37.5665, 126.978];
+const GEO_KEY = "vlntr-geo-v1";
+
+const headEl = document.getElementById("headActions");
+const countEl = document.getElementById("count");
+const pinsEl = document.getElementById("pins");
+const unmappedEl = document.getElementById("unmapped");
+
+let user = null;
+let posts = [];
+let markers = {};   // { 기회 id: L.CircleMarker }
+let selected = null;
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  });
+}
+
+function renderHeader() {
+  if (user) {
+    const label = user.user_metadata?.name || user.email || "로그인됨";
+    headEl.innerHTML =
+      '<span class="who">' + esc(label) + "</span>" +
+      '<a class="btn" href="./new.html">기회 등록</a>' +
+      '<a class="btn ghost" href="./mypage.html">마이페이지</a>' +
+      '<button class="ghost" id="signOut">로그아웃</button>';
+    document.getElementById("signOut").addEventListener("click", function () {
+      supabase.auth.signOut();
+    });
+  } else {
+    headEl.innerHTML =
+      '<a class="btn ghost" href="./list.html">기회 목록</a>' +
+      '<button id="signIn">구글로 로그인</button>';
+    document.getElementById("signIn").addEventListener("click", function () {
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: location.origin + location.pathname },
+      });
+    });
+  }
+}
+
+// ── 지도 ────────────────────────────────────────────────
+const map = L.map("map", { scrollWheelZoom: false }).setView(SEOUL, 11);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자',
+}).addTo(map);
+// 스크롤로 페이지를 내리다 지도가 확대되는 일이 없도록, 클릭한 뒤에만 휠 확대를 켠다
+map.on("click", function () { map.scrollWheelZoom.enable(); });
+map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
+
+// ── 위치 찾기 (Nominatim) ────────────────────────────────
+// 좌표 컬럼이 아직 없으므로 주소 문자열로 그때그때 찾고, 브라우저에 캐시한다.
+// 정책상 초당 1회로 제한되어 있어 캐시에 없는 것만 순서대로 처리한다.
+function loadCache() {
+  try { return JSON.parse(localStorage.getItem(GEO_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+function saveCache(cache) {
+  try { localStorage.setItem(GEO_KEY, JSON.stringify(cache)); } catch (e) {}
+}
+
+async function geocode(text) {
+  const url =
+    "https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&q=" +
+    encodeURIComponent(text);
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("geocode failed: " + res.status);
+  const data = await res.json();
+  if (!data.length) return null;
+  return [Number(data[0].lat), Number(data[0].lon)];
+}
+
+async function resolveAll(list) {
+  const cache = loadCache();
+  const todo = list.filter((p) => !(p.location in cache));
+  let done = 0;
+
+  for (const p of todo) {
+    countEl.textContent = "위치 찾는 중… " + ++done + " / " + todo.length;
+    try {
+      cache[p.location] = await geocode(p.location);
+    } catch (err) {
+      console.error(err);
+      cache[p.location] = null; // 실패도 기록해 매번 다시 부르지 않는다
+    }
+    saveCache(cache);
+    if (done < todo.length) await new Promise((r) => setTimeout(r, 1100));
+  }
+  return cache;
+}
+
+// 같은 동네가 여러 건이면 핀이 완전히 겹치므로 아주 조금씩 흩어 놓는다
+function spread(list, cache) {
+  const seen = {};
+  return list.map(function (p) {
+    const base = cache[p.location];
+    if (!base) return { post: p, at: null };
+    const k = base.join(",");
+    const n = (seen[k] = (seen[k] || 0) + 1) - 1;
+    const angle = n * 2.4;
+    const r = n === 0 ? 0 : 0.0006 * Math.ceil(n / 6);
+    return { post: p, at: [base[0] + r * Math.cos(angle), base[1] + r * Math.sin(angle)] };
+  });
+}
+
+function popupHtml(p) {
+  const left = Math.max(0, p.needed - p.applied);
+  return (
+    "<b>" + esc(p.title) + "</b>" +
+    '<div class="org">' + esc(p.org) + "</div>" +
+    "<dl>" +
+      "<dt>위치</dt><dd>" + esc(p.location) + "</dd>" +
+      "<dt>날짜</dt><dd>" + esc(p.event_date) + "</dd>" +
+      "<dt>시간</dt><dd>" + esc(p.event_time) + "</dd>" +
+      "<dt>인원</dt><dd>" + (left ? left + "자리 남음" : "모집 마감") + "</dd>" +
+    "</dl>" +
+    '<a class="btn" href="./list.html#opp-' + p.id + '">목록에서 신청하기</a>'
+  );
+}
+
+function pinHtml(p, mapped) {
+  const left = Math.max(0, p.needed - p.applied);
+  return (
+    '<button class="pin' + (mapped ? "" : " off") + '"' +
+      (mapped ? ' data-id="' + p.id + '"' : " disabled") + ">" +
+      "<b>" + esc(p.title) + "</b>" +
+      '<span class="org">' + esc(p.org) + "</span>" +
+      '<span class="meta">' + esc(p.location) + " · " + esc(p.event_date) + "</span>" +
+      '<span class="' + (left ? "seat" : "meta") + '">' +
+        (left ? left + "자리 남음" : "모집 마감") +
+      "</span>" +
+    "</button>"
+  );
+}
+
+function select(id) {
+  selected = id;
+  pinsEl.querySelectorAll(".pin").forEach(function (b) {
+    b.setAttribute("aria-current", String(Number(b.dataset.id) === id));
+  });
+  const m = markers[id];
+  if (!m) return;
+  map.setView(m.getLatLng(), Math.max(map.getZoom(), 14), { animate: true });
+  m.openPopup();
+}
+
+function accent() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+}
+
+// 테마를 바꾸면 핀 색도 같이 맞춘다 (핀 색은 그릴 때 계산해 둔 값이라 자동으로 안 바뀐다)
+function recolor() {
+  const c = accent();
+  Object.values(markers).forEach(function (m) {
+    m.setStyle({ color: c, fillColor: c });
+  });
+}
+new MutationObserver(recolor).observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["data-theme"],
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", recolor);
+
+function draw(resolved) {
+  const mapped = resolved.filter((r) => r.at);
+  const missing = resolved.filter((r) => !r.at);
+
+  Object.values(markers).forEach((m) => m.remove());
+  markers = {};
+
+  for (const r of mapped) {
+    const marker = L.circleMarker(r.at, {
+      radius: 9,
+      weight: 2,
+      color: accent(),
+      fillColor: accent(),
+      fillOpacity: 0.75,
+    })
+      .addTo(map)
+      .bindPopup(popupHtml(r.post));
+    marker.on("click", function () { select(r.post.id); });
+    markers[r.post.id] = marker;
+  }
+
+  countEl.textContent =
+    "기회 " + resolved.length + "건 중 " + mapped.length + "곳을 지도에 표시했습니다";
+
+  pinsEl.innerHTML = mapped.length
+    ? mapped.map((r) => pinHtml(r.post, true)).join("")
+    : '<p class="status">지도에 표시할 기회가 없습니다.</p>';
+
+  unmappedEl.innerHTML = missing.length
+    ? "<h2>위치를 찾지 못한 기회 " + missing.length + "건</h2>" +
+      missing.map((r) => pinHtml(r.post, false)).join("")
+    : "";
+
+  if (mapped.length) {
+    map.fitBounds(L.latLngBounds(mapped.map((r) => r.at)), {
+      padding: [40, 40],
+      maxZoom: 15,
+    });
+  }
+}
+
+pinsEl.addEventListener("click", function (e) {
+  const b = e.target.closest(".pin[data-id]");
+  if (b) select(Number(b.dataset.id));
+});
+
+async function load() {
+  try {
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select("*")
+      .order("id");
+    if (error) throw error;
+    posts = data;
+
+    if (!posts.length) {
+      countEl.textContent = "등록된 기회가 없습니다";
+      pinsEl.innerHTML = '<p class="status">아직 올라온 기회가 없습니다.</p>';
+      return;
+    }
+
+    const cache = await resolveAll(posts);
+    draw(spread(posts, cache));
+  } catch (err) {
+    console.error(err);
+    countEl.textContent = "";
+    pinsEl.innerHTML =
+      '<p class="status error">기회를 불러오지 못했습니다. 새로고침해 주세요.</p>';
+  }
+}
+
+supabase.auth.onAuthStateChange(function (_event, session) {
+  user = session?.user || null;
+  renderHeader();
+});
+
+const { data: sessionData } = await supabase.auth.getSession();
+user = sessionData.session?.user || null;
+renderHeader();
+load();
+</script>
+</body>
+</html>

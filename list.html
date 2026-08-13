@@ -48,6 +48,13 @@
   }
   main { padding: 20px 16px 60px; }
   .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .count a { color: var(--accent); text-decoration: none; margin-left: 6px; }
+  .count a:hover { text-decoration: underline; }
+  /* 지도에서 넘어온 카드를 잠깐 강조한다 */
+  .card.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card.flash { transition: box-shadow 0.4s ease, border-color 0.4s ease; }
+  }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -93,6 +100,7 @@
   .apply-form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .apply-form .row { display: flex; align-items: center; gap: 10px; }
   .form-error { font-size: 13px; color: var(--err); }
+  .row-err { font-size: 13px; color: var(--err); }
   .roster {
     margin-top: 14px;
     padding-top: 14px;
@@ -273,11 +281,14 @@ function card(p) {
     const note = mine
       ? '<span class="note done">신청되었습니다. 기관에서 연락드립니다.</span>'
       : '<span class="note">' + p.applied + " / " + p.needed + "명 신청</span>";
-    actions = '<div class="actions">' + btn + note + "</div>";
+    actions =
+      '<div class="actions">' + btn + note +
+        '<span class="row-err" data-error="' + p.id + '"></span>' +
+      "</div>";
   }
 
   return (
-    '<article class="card">' +
+    '<article class="card" id="opp-' + p.id + '">' +
       "<h2>" + esc(p.title) +
         (isOwner ? '<span class="badge">내가 올린 기회</span>' : "") +
         (p.hidden ? '<span class="badge hidden-b">숨김</span>' : "") +
@@ -297,8 +308,30 @@ function card(p) {
 
 function render() {
   renderHeader();
-  countEl.textContent = "모집 중인 기회 " + posts.length + "건";
+  countEl.innerHTML =
+    "모집 중인 기회 " + posts.length + '건 <a href="./map.html">지도로 보기</a>';
   listEl.innerHTML = posts.map(card).join("");
+  jumpToHash();
+}
+
+// 지도에서 ./list.html#opp-3 으로 들어오면 그 카드로 내려간다.
+// 카드는 비동기로 그려지므로 브라우저의 기본 이동은 이미 지나간 뒤다.
+let jumped = false;
+function jumpToHash() {
+  if (jumped) return;
+  const m = /^#opp-\d+$/.exec(location.hash);
+  if (!m) return;
+  const el = listEl.querySelector(location.hash);
+  if (!el) return;
+  jumped = true;
+  el.scrollIntoView({ block: "center" });
+  el.classList.add("flash");
+}
+
+// 오류는 해당 카드 안에 표시한다. render()가 카드를 다시 그리므로 그 뒤에 호출할 것.
+function showRowError(id, text) {
+  const el = listEl.querySelector('[data-error="' + id + '"]');
+  if (el) el.textContent = text;
 }
 
 function setApplied(id, applied) {
@@ -331,9 +364,10 @@ listEl.addEventListener("click", async function (e) {
     btn.textContent = "처리 중…";
     const { data, error } = await supabase.rpc("cancel_application", { opp_id: id });
     if (error) {
+      // alert()은 페이지를 멈추므로 해당 카드 안에 표시한다
       console.error(error);
-      alert("취소에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       await refresh();
+      showRowError(id, "취소하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
     myOppIds.delete(id);
