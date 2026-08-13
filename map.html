@@ -71,7 +71,7 @@
     height: 100%;
     border: 1px solid var(--line);
     border-radius: 12px;
-    background: var(--card);
+    background: var(--bg);
   }
 
   .pin {
@@ -102,14 +102,15 @@
   .status.error { color: var(--err); }
 
   /* 지도 위 요소도 테마를 따라가게 */
-  .leaflet-tile-pane { filter: var(--tile-filter, none); }
   .leaflet-container { background: var(--bg); font: inherit; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background: var(--card);
     color: var(--text);
-    box-shadow: 0 6px 20px var(--shadow);
+    box-shadow: 0 4px 14px var(--shadow);
   }
-  .leaflet-popup-content { margin: 12px 14px; font-size: 14px; line-height: 1.5; }
+  .leaflet-popup-content-wrapper { border: 1px solid var(--line); border-radius: 10px; }
+  /* 오른쪽 위 닫기 버튼과 제목이 겹치지 않게 여백을 둔다 */
+  .leaflet-popup-content { margin: 12px 24px 12px 14px; font-size: 14px; line-height: 1.5; }
   .leaflet-popup-content b { font-size: 15px; }
   .leaflet-popup-content .org { color: var(--muted); font-size: 13px; }
   .leaflet-popup-content dl { margin: 8px 0 10px; display: grid; grid-template-columns: 40px 1fr; row-gap: 3px; font-size: 13px; }
@@ -117,13 +118,37 @@
   .leaflet-popup-content dd { margin: 0; }
   .leaflet-popup-content a.btn { font-size: 13px; padding: 7px 12px; display: inline-block; }
   .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
+
+  /* 확대·축소 버튼도 카드와 같은 납작한 모양으로 */
+  .leaflet-bar {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: none;
+    overflow: hidden;
+  }
   .leaflet-bar a, .leaflet-bar a:hover {
-    background: var(--card); color: var(--text); border-bottom-color: var(--line);
+    background: var(--card);
+    color: var(--muted);
+    border-bottom-color: var(--line);
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    font-size: 16px;
   }
+  .leaflet-bar a:hover { color: var(--text); }
+
+  /* 출처 표기는 라이선스상 남겨야 하므로, 지우는 대신 최대한 작고 조용하게 */
   .leaflet-control-attribution {
-    background: var(--card); color: var(--muted);
+    background: none;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.4;
+    padding: 0 4px;
+    margin: 0 2px 2px 0;
+    opacity: 0.75;
   }
-  .leaflet-control-attribution a { color: var(--muted); }
+  .leaflet-control-attribution a { color: var(--muted); text-decoration: none; }
+  .leaflet-control-attribution:hover { opacity: 1; }
 
   @media (max-width: 860px) {
     .split {
@@ -217,11 +242,38 @@ function renderHeader() {
 }
 
 // ── 지도 ────────────────────────────────────────────────
-const map = L.map("map", { scrollWheelZoom: false }).setView(SEOUL, 11);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+// 기본 OSM 타일은 색이 많아 산만해서, 도로·지명만 남은 납작한 베이스맵을 쓴다.
+// 다크는 필터로 반전시키지 않고 전용 다크 타일로 바꾼다. 둘 다 키가 필요 없다.
+const TILES = {
+  light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+};
+const TILE_OPTS = {
   maxZoom: 19,
-  attribution: '지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자',
-}).addTo(map);
+  subdomains: "abcd",
+  attribution:
+    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+};
+
+const map = L.map("map", {
+  scrollWheelZoom: false,
+  attributionControl: false,
+}).setView(SEOUL, 11);
+L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
+
+function isDark() {
+  const set = document.documentElement.getAttribute("data-theme");
+  if (set) return set === "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+let tiles = L.tileLayer(TILES[isDark() ? "dark" : "light"], TILE_OPTS).addTo(map);
+
+function swapTiles() {
+  const next = L.tileLayer(TILES[isDark() ? "dark" : "light"], TILE_OPTS).addTo(map);
+  // 새 타일이 다 그려진 뒤에 옛것을 걷어내야 중간에 빈 화면이 보이지 않는다
+  next.once("load", function () { tiles.remove(); tiles = next; });
+}
 // 스크롤로 페이지를 내리다 지도가 확대되는 일이 없도록, 클릭한 뒤에만 휠 확대를 켠다
 map.on("click", function () { map.scrollWheelZoom.enable(); });
 map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
@@ -316,28 +368,45 @@ function select(id) {
   pinsEl.querySelectorAll(".pin").forEach(function (b) {
     b.setAttribute("aria-current", String(Number(b.dataset.id) === id));
   });
+  Object.keys(markers).forEach(function (k) {
+    markers[k].setStyle(markerStyle(Number(k) === id));
+  });
   const m = markers[id];
   if (!m) return;
   map.setView(m.getLatLng(), Math.max(map.getZoom(), 14), { animate: true });
   m.openPopup();
 }
 
-function accent() {
-  return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function accent() { return token("--accent"); }
+
+// 납작한 점 하나. 테두리는 지도 배경색이라 타일 위에서 깔끔하게 떨어진다.
+function markerStyle(isSelected) {
+  return {
+    radius: isSelected ? 11 : 7,
+    weight: 3,
+    color: token("--card"),
+    opacity: 1,
+    fillColor: accent(),
+    fillOpacity: 1,
+  };
 }
 
-// 테마를 바꾸면 핀 색도 같이 맞춘다 (핀 색은 그릴 때 계산해 둔 값이라 자동으로 안 바뀐다)
-function recolor() {
-  const c = accent();
-  Object.values(markers).forEach(function (m) {
-    m.setStyle({ color: c, fillColor: c });
+// 테마를 바꾸면 타일과 핀 색을 같이 맞춘다
+// (핀 색은 그릴 때 계산해 둔 값이라 자동으로 안 바뀐다)
+function applyTheme() {
+  Object.keys(markers).forEach(function (id) {
+    markers[id].setStyle(markerStyle(Number(id) === selected));
   });
+  swapTiles();
 }
-new MutationObserver(recolor).observe(document.documentElement, {
+new MutationObserver(applyTheme).observe(document.documentElement, {
   attributes: true,
   attributeFilter: ["data-theme"],
 });
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", recolor);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
 function draw(resolved) {
   const mapped = resolved.filter((r) => r.at);
@@ -347,13 +416,7 @@ function draw(resolved) {
   markers = {};
 
   for (const r of mapped) {
-    const marker = L.circleMarker(r.at, {
-      radius: 9,
-      weight: 2,
-      color: accent(),
-      fillColor: accent(),
-      fillOpacity: 0.75,
-    })
+    const marker = L.circleMarker(r.at, markerStyle(false))
       .addTo(map)
       .bindPopup(popupHtml(r.post));
     marker.on("click", function () { select(r.post.id); });
