@@ -6,8 +6,6 @@
 <title>vlntr — 봉사 기회 지도</title>
 <link rel="stylesheet" href="./theme.css">
 <script src="./theme.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -72,6 +70,7 @@
     border: 1px solid var(--line);
     border-radius: 12px;
     background: var(--bg);
+    overflow: hidden;
   }
 
   .pin {
@@ -100,27 +99,67 @@
   .side h2 { margin: 18px 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
   .status { color: var(--muted); font-size: 14px; padding: 16px 0; }
   .status.error { color: var(--err); }
+  .fallback-note {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--warn);
+    background: var(--warn-weak);
+    border: 1px solid var(--warn-line);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
 
-  /* 지도 위 요소도 테마를 따라가게 */
-  .leaflet-container { background: var(--bg); font: inherit; }
+  /* ── 말풍선 안쪽 (두 지도 공통) ───────────────────────── */
+  .win b { font-size: 15px; }
+  .win .org { color: var(--muted); font-size: 13px; }
+  .win dl { margin: 8px 0 10px; display: grid; grid-template-columns: 40px 1fr; row-gap: 3px; font-size: 13px; }
+  .win dt { color: var(--muted); }
+  .win dd { margin: 0; }
+  .win a.btn { font-size: 13px; padding: 7px 12px; display: inline-block; }
+
+  /* ── 네이버 지도용 ──────────────────────────────────── */
+  /* 네이버 지도에는 다크 스타일이 없어서 지도 전체 밝기를 낮추고,
+     그 위에 얹는 핀·말풍선은 반대로 밝혀 원래 색을 되돌린다. */
+  #map.naver { filter: var(--map-dim, none); }
+  #map.naver .npin-wrap, #map.naver .nwin { filter: var(--map-undim, none); }
+
+  .npin-wrap { width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; }
+  .npin {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--card);
+    transition: width 0.12s ease, height 0.12s ease;
+  }
+  .npin-wrap.on .npin { width: 20px; height: 20px; }
+  .nwin {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 4px 14px var(--shadow);
+    padding: 12px 14px;
+    max-width: 260px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .nwin .close {
+    float: right;
+    background: none; border: 0; padding: 0 0 0 8px;
+    color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer;
+  }
+
+  /* ── Leaflet용 (키가 없을 때 대체 지도) ──────────────── */
   .leaflet-tile-pane { filter: var(--map-dim, none); }
+  .leaflet-container { background: var(--bg); font: inherit; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background: var(--card);
     color: var(--text);
     box-shadow: 0 4px 14px var(--shadow);
   }
   .leaflet-popup-content-wrapper { border: 1px solid var(--line); border-radius: 10px; }
-  /* 오른쪽 위 닫기 버튼과 제목이 겹치지 않게 여백을 둔다 */
   .leaflet-popup-content { margin: 12px 24px 12px 14px; font-size: 14px; line-height: 1.5; }
-  .leaflet-popup-content b { font-size: 15px; }
-  .leaflet-popup-content .org { color: var(--muted); font-size: 13px; }
-  .leaflet-popup-content dl { margin: 8px 0 10px; display: grid; grid-template-columns: 40px 1fr; row-gap: 3px; font-size: 13px; }
-  .leaflet-popup-content dt { color: var(--muted); }
-  .leaflet-popup-content dd { margin: 0; }
-  .leaflet-popup-content a.btn { font-size: 13px; padding: 7px 12px; display: inline-block; }
   .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
-
-  /* 확대·축소 버튼도 카드와 같은 납작한 모양으로 */
   .leaflet-bar {
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -131,14 +170,9 @@
     background: var(--card);
     color: var(--muted);
     border-bottom-color: var(--line);
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
-    font-size: 16px;
+    width: 28px; height: 28px; line-height: 28px; font-size: 16px;
   }
   .leaflet-bar a:hover { color: var(--text); }
-
-  /* 출처 표기는 라이선스상 남겨야 하므로, 지우는 대신 최대한 작고 조용하게 */
   .leaflet-control-attribution {
     background: none;
     color: var(--muted);
@@ -183,6 +217,7 @@
   </p>
   <div class="split">
     <div class="side">
+      <p class="fallback-note" id="fallbackNote" hidden></p>
       <div id="pins"></div>
       <div id="unmapped"></div>
     </div>
@@ -192,6 +227,12 @@
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// ── 네이버 지도 키 ──────────────────────────────────────
+// 네이버 클라우드 플랫폼 콘솔에서 발급받은 Client ID를 넣으면 네이버 지도로 바뀐다.
+// 비워두면 OpenStreetMap 지도를 쓴다. (콘솔에서 Dynamic Map 체크 + 서비스 URL 등록 필수)
+// 이 값은 스크립트 주소에 그대로 드러나므로 비밀이 아니다. 보호는 등록한 도메인으로 한다.
+const NAVER_CLIENT_ID = "";
 
 const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -206,16 +247,22 @@ const headEl = document.getElementById("headActions");
 const countEl = document.getElementById("count");
 const pinsEl = document.getElementById("pins");
 const unmappedEl = document.getElementById("unmapped");
+const mapEl = document.getElementById("map");
+const noteEl = document.getElementById("fallbackNote");
 
 let user = null;
 let posts = [];
-let markers = {};   // { 기회 id: L.CircleMarker }
 let selected = null;
+let gmap = null; // 지도 어댑터 (네이버 또는 Leaflet)
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
   });
+}
+
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 function renderHeader() {
@@ -242,27 +289,230 @@ function renderHeader() {
   }
 }
 
-// ── 지도 ────────────────────────────────────────────────
-// Carto Voyager. 도로·물·공원 색은 남기고 잡다한 표시는 뺀 지도라
-// 깔끔하면서도 지형이 읽힌다. 확대하면 지명이 한글로 나온다. 키는 필요 없다.
-// 다크에서는 전용 다크 타일(거의 검정)로 바꾸는 대신 밝기만 낮춘다 — theme.css의 --map-dim.
-const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+// ── 스크립트 로더 ───────────────────────────────────────
+function loadScript(src) {
+  return new Promise(function (resolve, reject) {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = function () { reject(new Error("script load failed: " + src)); };
+    document.head.appendChild(s);
+  });
+}
 
-const map = L.map("map", {
-  scrollWheelZoom: false,
-  attributionControl: false,
-}).setView(SEOUL, 11);
-L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
+function loadCss(href) {
+  return new Promise(function (resolve) {
+    const l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.href = href;
+    l.onload = resolve;
+    l.onerror = resolve; // 스타일이 늦어도 지도는 뜬다
+    document.head.appendChild(l);
+  });
+}
 
-L.tileLayer(TILE_URL, {
-  maxZoom: 19,
-  subdomains: "abcd",
-  attribution:
-    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
-}).addTo(map);
-// 스크롤로 페이지를 내리다 지도가 확대되는 일이 없도록, 클릭한 뒤에만 휠 확대를 켠다
-map.on("click", function () { map.scrollWheelZoom.enable(); });
-map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
+// 네이버 지도 스크립트. 인증 실패는 전역 콜백으로만 알려주므로 그것도 함께 지켜본다.
+// 파라미터 이름이 ncpKeyId(신) / ncpClientId(구)로 갈려 있어 순서대로 시도한다.
+async function loadNaver(clientId) {
+  const params = ["ncpKeyId", "ncpClientId"];
+  let lastErr = null;
+
+  for (const p of params) {
+    try {
+      await new Promise(function (resolve, reject) {
+        const timer = setTimeout(function () { reject(new Error("naver maps timeout")); }, 8000);
+        window.navermap_authFailure = function () {
+          clearTimeout(timer);
+          reject(new Error("naver maps auth failed"));
+        };
+        loadScript("https://oapi.map.naver.com/openapi/v3/maps.js?" + p + "=" + encodeURIComponent(clientId))
+          .then(function () {
+            // 인증 실패 콜백이 뒤늦게 올 수 있어 조금 기다렸다가 확정한다
+            setTimeout(function () {
+              clearTimeout(timer);
+              if (window.naver && window.naver.maps) resolve();
+              else reject(new Error("naver.maps missing"));
+            }, 400);
+          }, function (e) { clearTimeout(timer); reject(e); });
+      });
+      return true;
+    } catch (err) {
+      lastErr = err;
+      delete window.naver;
+    }
+  }
+  throw lastErr || new Error("naver maps unavailable");
+}
+
+// ── 지도 어댑터 ─────────────────────────────────────────
+// 두 지도의 사용법이 달라서, 화면 쪽 코드가 쓰는 동작만 같은 이름으로 맞춘다.
+function naverAdapter(onSelect) {
+  mapEl.classList.add("naver");
+  const nm = naver.maps;
+  const map = new nm.Map(mapEl, {
+    center: new nm.LatLng(SEOUL[0], SEOUL[1]),
+    zoom: 11,
+    scrollWheel: false,
+    zoomControl: true,
+    zoomControlOptions: { style: nm.ZoomControlStyle.SMALL, position: nm.Position.TOP_LEFT },
+    mapDataControl: false,
+  });
+  // 목록을 훑다가 지도 위에서 휠이 잡히지 않도록, 지도를 누른 뒤에만 확대를 켠다
+  nm.Event.addListener(map, "click", function () { map.setOptions("scrollWheel", true); });
+  mapEl.addEventListener("mouseleave", function () { map.setOptions("scrollWheel", false); });
+
+  let items = [];
+  let overlays = {};
+  const info = new nm.InfoWindow({
+    content: "",
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    disableAnchor: true,
+    pixelOffset: new nm.Point(0, -16),
+  });
+  // 말풍선은 지도 위에 그려지는 그냥 HTML이라 닫기 버튼을 직접 연결해야 한다
+  mapEl.addEventListener("click", function (e) {
+    if (e.target.closest("[data-close]")) info.close();
+  });
+
+  return {
+    setPins(list) {
+      Object.values(overlays).forEach(function (m) { m.setMap(null); });
+      overlays = {};
+      items = list;
+      list.forEach(function (it) {
+        const marker = new nm.Marker({
+          position: new nm.LatLng(it.at[0], it.at[1]),
+          map: map,
+          icon: {
+            content: '<div class="npin-wrap"><i class="npin"></i></div>',
+            size: new nm.Size(26, 26),
+            anchor: new nm.Point(13, 13),
+          },
+          zIndex: 10,
+        });
+        nm.Event.addListener(marker, "click", function () { onSelect(it.id); });
+        overlays[it.id] = marker;
+      });
+    },
+    focus(id) {
+      const it = items.find(function (x) { return x.id === id; });
+      if (!it) return;
+      Object.keys(overlays).forEach(function (k) {
+        const on = Number(k) === id;
+        overlays[k].setIcon({
+          content: '<div class="npin-wrap' + (on ? " on" : "") + '"><i class="npin"></i></div>',
+          size: new nm.Size(26, 26),
+          anchor: new nm.Point(13, 13),
+        });
+        overlays[k].setZIndex(on ? 30 : 10);
+      });
+      const pos = new nm.LatLng(it.at[0], it.at[1]);
+      map.morph(pos, Math.max(map.getZoom(), 14));
+      info.setContent('<div class="nwin">' +
+        '<button type="button" class="close" data-close="1" aria-label="닫기">&times;</button>' +
+        it.html + "</div>");
+      info.open(map, pos);
+    },
+    fitAll(coords) {
+      if (!coords.length) return;
+      const b = new nm.LatLngBounds(
+        new nm.LatLng(coords[0][0], coords[0][1]),
+        new nm.LatLng(coords[0][0], coords[0][1])
+      );
+      coords.forEach(function (c) { b.extend(new nm.LatLng(c[0], c[1])); });
+      map.fitBounds(b, { top: 40, right: 40, bottom: 40, left: 40 });
+    },
+    restyle() {},
+  };
+}
+
+async function leafletAdapter(onSelect) {
+  await loadCss("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+  await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+
+  const map = L.map(mapEl, { scrollWheelZoom: false, attributionControl: false })
+    .setView(SEOUL, 11);
+  L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    maxZoom: 19,
+    subdomains: "abcd",
+    attribution:
+      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+  }).addTo(map);
+  map.on("click", function () { map.scrollWheelZoom.enable(); });
+  map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
+
+  let overlays = {};
+
+  function style(on) {
+    return {
+      radius: on ? 11 : 7,
+      weight: 3,
+      color: token("--card"),
+      opacity: 1,
+      fillColor: token("--accent"),
+      fillOpacity: 1,
+    };
+  }
+
+  return {
+    setPins(list) {
+      Object.values(overlays).forEach(function (m) { m.remove(); });
+      overlays = {};
+      list.forEach(function (it) {
+        const m = L.circleMarker(it.at, style(false))
+          .addTo(map)
+          .bindPopup('<div class="win">' + it.html + "</div>");
+        m.on("click", function () { onSelect(it.id); });
+        overlays[it.id] = m;
+      });
+    },
+    focus(id) {
+      Object.keys(overlays).forEach(function (k) {
+        overlays[k].setStyle(style(Number(k) === id));
+      });
+      const m = overlays[id];
+      if (!m) return;
+      map.setView(m.getLatLng(), Math.max(map.getZoom(), 14), { animate: true });
+      m.openPopup();
+    },
+    fitAll(coords) {
+      if (coords.length) map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 15 });
+    },
+    restyle() {
+      Object.keys(overlays).forEach(function (k) {
+        overlays[k].setStyle(style(Number(k) === selected));
+      });
+    },
+  };
+}
+
+async function makeMap(onSelect) {
+  if (NAVER_CLIENT_ID) {
+    try {
+      await loadNaver(NAVER_CLIENT_ID);
+      return naverAdapter(onSelect);
+    } catch (err) {
+      console.error(err);
+      noteEl.hidden = false;
+      noteEl.textContent =
+        "네이버 지도를 불러오지 못해 기본 지도로 표시합니다. 콘솔에서 서비스 URL 등록과 Dynamic Map 사용 설정을 확인해 주세요.";
+      mapEl.classList.remove("naver");
+      mapEl.innerHTML = "";
+    }
+  }
+  return leafletAdapter(onSelect);
+}
+
+// 테마가 바뀌면 핀 색을 다시 칠한다 (그릴 때 계산해 둔 값이라 자동으로 안 바뀐다)
+new MutationObserver(function () { if (gmap) gmap.restyle(); }).observe(
+  document.documentElement,
+  { attributes: true, attributeFilter: ["data-theme"] }
+);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+  if (gmap) gmap.restyle();
+});
 
 // ── 위치 찾기 (Nominatim) ────────────────────────────────
 // 좌표 컬럼이 아직 없으므로 주소 문자열로 그때그때 찾고, 브라우저에 캐시한다.
@@ -319,7 +569,7 @@ function spread(list, cache) {
   });
 }
 
-function popupHtml(p) {
+function winHtml(p) {
   const left = Math.max(0, p.needed - p.applied);
   return (
     "<b>" + esc(p.title) + "</b>" +
@@ -354,58 +604,20 @@ function select(id) {
   pinsEl.querySelectorAll(".pin").forEach(function (b) {
     b.setAttribute("aria-current", String(Number(b.dataset.id) === id));
   });
-  Object.keys(markers).forEach(function (k) {
-    markers[k].setStyle(markerStyle(Number(k) === id));
-  });
-  const m = markers[id];
-  if (!m) return;
-  map.setView(m.getLatLng(), Math.max(map.getZoom(), 14), { animate: true });
-  m.openPopup();
+  if (gmap) gmap.focus(id);
 }
-
-function token(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-function accent() { return token("--accent"); }
-
-// 납작한 점 하나. 테두리는 지도 배경색이라 타일 위에서 깔끔하게 떨어진다.
-function markerStyle(isSelected) {
-  return {
-    radius: isSelected ? 11 : 7,
-    weight: 3,
-    color: token("--card"),
-    opacity: 1,
-    fillColor: accent(),
-    fillOpacity: 1,
-  };
-}
-
-// 타일 밝기는 CSS가 알아서 따라가지만, 핀 색은 그릴 때 계산해 둔 값이라
-// 테마가 바뀌면 다시 칠해줘야 한다.
-function applyTheme() {
-  Object.keys(markers).forEach(function (id) {
-    markers[id].setStyle(markerStyle(Number(id) === selected));
-  });
-}
-new MutationObserver(applyTheme).observe(document.documentElement, {
-  attributes: true,
-  attributeFilter: ["data-theme"],
-});
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
 function draw(resolved) {
   const mapped = resolved.filter((r) => r.at);
   const missing = resolved.filter((r) => !r.at);
 
-  Object.values(markers).forEach((m) => m.remove());
-  markers = {};
-
-  for (const r of mapped) {
-    const marker = L.circleMarker(r.at, markerStyle(false))
-      .addTo(map)
-      .bindPopup(popupHtml(r.post));
-    marker.on("click", function () { select(r.post.id); });
-    markers[r.post.id] = marker;
+  if (gmap) {
+    gmap.setPins(mapped.map((r) => ({
+      id: r.post.id,
+      at: r.at,
+      html: '<div class="win">' + winHtml(r.post) + "</div>",
+    })));
+    gmap.fitAll(mapped.map((r) => r.at));
   }
 
   countEl.textContent =
@@ -419,13 +631,6 @@ function draw(resolved) {
     ? "<h2>위치를 찾지 못한 기회 " + missing.length + "건</h2>" +
       missing.map((r) => pinHtml(r.post, false)).join("")
     : "";
-
-  if (mapped.length) {
-    map.fitBounds(L.latLngBounds(mapped.map((r) => r.at)), {
-      padding: [40, 40],
-      maxZoom: 15,
-    });
-  }
 }
 
 pinsEl.addEventListener("click", function (e) {
@@ -466,6 +671,8 @@ supabase.auth.onAuthStateChange(function (_event, session) {
 const { data: sessionData } = await supabase.auth.getSession();
 user = sessionData.session?.user || null;
 renderHeader();
+
+gmap = await makeMap(select);
 load();
 </script>
 </body>

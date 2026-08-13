@@ -47,9 +47,11 @@
     - 내가 올린 기회: 수정 / 숨기기·다시 공개 / 삭제 + 신청자 명단
     - 내 신청 내역: 신청 정보 확인 + 신청 취소
   - `map.html` — 지도. 기회를 핀으로 표시하고, 왼쪽 목록과 서로 연동된다.
-    좌표 컬럼이 아직 없어서 `location` 문자열을 Nominatim(OpenStreetMap)으로
-    그때그때 찾고 브라우저에 캐시한다. API 키는 필요 없다.
-    위치를 못 찾은 기회는 목록 아래에 따로 보여준다
+    파일 맨 위 `NAVER_CLIENT_ID`에 네이버 클라우드 플랫폼 Client ID를 넣으면
+    네이버 지도로, 비워두면 OpenStreetMap(Carto Voyager) 지도로 그린다.
+    인증에 실패해도 OpenStreetMap으로 자동 대체되므로 화면이 비지 않는다.
+    좌표 컬럼이 아직 없어서 `location` 문자열을 Nominatim으로 그때그때 찾고
+    브라우저에 캐시한다. 위치를 못 찾은 기회는 목록 아래에 따로 보여준다
   - `theme.css` / `theme.js` — 각 화면이 공유하는 색 토큰과 라이트/다크 전환.
     처음에는 OS 설정(`prefers-color-scheme`)을 따르고, 헤더의 해·달 버튼으로 바꾸면
     그 선택을 `localStorage`에 저장해 이후 모든 화면에 적용한다
