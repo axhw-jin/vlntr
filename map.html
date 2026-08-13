@@ -126,15 +126,32 @@
      호스트 대신 경로로 고른다. (DOM 구조로 고르면 확대할 때 층이 새로 만들어져 풀린다) */
   #map.naver img[src*="/styles/"] { filter: var(--naver-dim, none); }
 
-  .npin-wrap { width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; }
+  /* 지도 핀. 끝점이 실제 좌표에 닿는 물방울 모양이라 위치가 분명하다.
+     고를 때 커지는 기준점을 아래 끝으로 두어, 끝점은 제자리에 머문다. */
   .npin {
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 3px solid var(--card);
-    transition: width 0.12s ease, height 0.12s ease;
+    width: 30px;
+    height: 38px;
+    cursor: pointer;
+    transform-origin: 50% 100%;
+    transition: transform 0.14s ease;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.32));
   }
-  .npin-wrap.on .npin { width: 20px; height: 20px; }
+  .npin svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .npin .body {
+    fill: var(--pin);
+    stroke: var(--pin-ink);
+    stroke-width: 2;
+  }
+  .npin .dot { fill: var(--pin-ink); }
+  .npin.on { transform: scale(1.22); }
+  /* 모집이 끝난 곳은 한 톤 죽여 남은 자리가 있는 곳이 먼저 눈에 들어오게 */
+  .npin.full { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.22)); }
+  .npin.full .body { fill: var(--pin-off); }
+  @media (prefers-reduced-motion: reduce) {
+    .npin { transition: none; }
+  }
+  /* Leaflet 대체 지도에서 divIcon 기본 배경 제거 */
+  .leaflet-div-icon { background: transparent; border: 0; }
   .mapwrap { position: relative; height: 100%; min-height: 0; }
 
   /* 말풍선은 지도 위에 직접 띄운다. 핀은 항상 가로 가운데에 오도록 지도를 옮기므로
@@ -282,6 +299,21 @@ function token(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// 두 지도가 같은 핀을 쓴다. 색은 CSS(토큰)가 정하므로 테마를 그대로 따라간다.
+const PIN_W = 30;
+const PIN_H = 38;
+const PIN_H_ON = 46; // 고른 핀은 1.22배로 커진다 (아래 끝 기준)
+function mapPinHtml(it, on) {
+  return (
+    '<div class="npin' + (on ? " on" : "") + (it.full ? " full" : "") + '">' +
+      '<svg viewBox="-1.5 -1.5 33 41" aria-hidden="true">' +
+        '<path class="body" d="M15 0C6.7 0 0 6.7 0 15c0 10.9 13 21.6 13.6 22.1a2.2 2.2 0 0 0 2.8 0C17 36.6 30 25.9 30 15 30 6.7 23.3 0 15 0z"/>' +
+        '<circle class="dot" cx="15" cy="14.6" r="5"/>' +
+      "</svg>" +
+    "</div>"
+  );
+}
+
 function renderHeader() {
   if (user) {
     const label = user.user_metadata?.name || user.email || "로그인됨";
@@ -380,6 +412,15 @@ function naverAdapter(onSelect) {
 
   let items = [];
   let overlays = {};
+  // 핀 끝점이 좌표에 닿도록 아래 끝을 기준점으로 잡는다
+  function naverIcon(it, on) {
+    return {
+      content: mapPinHtml(it, on),
+      size: new nm.Size(PIN_W, PIN_H),
+      anchor: new nm.Point(PIN_W / 2, PIN_H),
+    };
+  }
+
   const win = document.getElementById("mapWin");
   function closeWin() { win.hidden = true; }
 
@@ -400,13 +441,13 @@ function naverAdapter(onSelect) {
 
     const mapH = mapEl.getBoundingClientRect().height;
     const h = win.getBoundingClientRect().height;
-    const middle = mapH / 2;                    // 지금 핀이 있는 자리
-    const wanted = Math.min(h + 18, mapH - 30); // 상자가 다 들어오는 핀 자리
+    const middle = mapH / 2;  // 지금 핀 끝점이 있는 자리
+    // 핀은 끝점에서 위로 PIN_H 만큼 서 있고, 그 위에 상자가 얹힌다
+    const wanted = Math.min(h + PIN_H_ON + 18, mapH - 12);
     const dy = Math.round(middle - wanted);
-    if (dy) map.panBy(new nm.Point(0, dy));     // 음수면 지도가 아래로 내려간다
+    if (dy) map.panBy(new nm.Point(0, dy)); // 음수면 지도가 아래로 내려간다
 
-    // 핀이 wanted 위치에 오므로, 상자 아랫변을 그보다 6px 위에 둔다
-    win.style.bottom = mapH - wanted + 6 + "px";
+    win.style.bottom = mapH - wanted + PIN_H_ON + 6 + "px";
   }
 
   return {
@@ -419,12 +460,8 @@ function naverAdapter(onSelect) {
         const marker = new nm.Marker({
           position: new nm.LatLng(it.at[0], it.at[1]),
           map: map,
-          icon: {
-            content: '<div class="npin-wrap"><i class="npin"></i></div>',
-            size: new nm.Size(26, 26),
-            anchor: new nm.Point(13, 13),
-          },
-          zIndex: 10,
+          icon: naverIcon(it, false),
+          zIndex: it.full ? 5 : 10,
         });
         nm.Event.addListener(marker, "click", function () { onSelect(it.id); });
         overlays[it.id] = marker;
@@ -433,14 +470,10 @@ function naverAdapter(onSelect) {
     focus(id) {
       const it = items.find(function (x) { return x.id === id; });
       if (!it) return;
-      Object.keys(overlays).forEach(function (k) {
-        const on = Number(k) === id;
-        overlays[k].setIcon({
-          content: '<div class="npin-wrap' + (on ? " on" : "") + '"><i class="npin"></i></div>',
-          size: new nm.Size(26, 26),
-          anchor: new nm.Point(13, 13),
-        });
-        overlays[k].setZIndex(on ? 30 : 10);
+      items.forEach(function (x) {
+        const on = x.id === id;
+        overlays[x.id].setIcon(naverIcon(x, on));
+        overlays[x.id].setZIndex(on ? 30 : x.full ? 5 : 10);
       });
       // 애니메이션(morph)으로 옮기면 뒤따르는 위치 계산과 어긋나므로 즉시 옮긴다
       map.setZoom(Math.max(map.getZoom(), 14), false);
@@ -478,24 +511,26 @@ async function leafletAdapter(onSelect) {
   map.on("mouseout", function () { map.scrollWheelZoom.disable(); });
 
   let overlays = {};
+  let items = [];
 
-  function style(on) {
-    return {
-      radius: on ? 11 : 7,
-      weight: 3,
-      color: token("--card"),
-      opacity: 1,
-      fillColor: token("--accent"),
-      fillOpacity: 1,
-    };
+  // 네이버 지도와 같은 핀을 쓴다
+  function icon(it, on) {
+    return L.divIcon({
+      html: mapPinHtml(it, on),
+      className: "",
+      iconSize: [PIN_W, PIN_H],
+      iconAnchor: [PIN_W / 2, PIN_H],
+      popupAnchor: [0, -PIN_H],
+    });
   }
 
   return {
     setPins(list) {
       Object.values(overlays).forEach(function (m) { m.remove(); });
       overlays = {};
+      items = list;
       list.forEach(function (it) {
-        const m = L.circleMarker(it.at, style(false))
+        const m = L.marker(it.at, { icon: icon(it, false), zIndexOffset: it.full ? 0 : 100 })
           .addTo(map)
           .bindPopup('<div class="win">' + it.html + "</div>");
         m.on("click", function () { onSelect(it.id); });
@@ -503,8 +538,8 @@ async function leafletAdapter(onSelect) {
       });
     },
     focus(id) {
-      Object.keys(overlays).forEach(function (k) {
-        overlays[k].setStyle(style(Number(k) === id));
+      items.forEach(function (x) {
+        overlays[x.id].setIcon(icon(x, x.id === id));
       });
       const m = overlays[id];
       if (!m) return;
@@ -514,11 +549,7 @@ async function leafletAdapter(onSelect) {
     fitAll(coords) {
       if (coords.length) map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 15 });
     },
-    restyle() {
-      Object.keys(overlays).forEach(function (k) {
-        overlays[k].setStyle(style(Number(k) === selected));
-      });
-    },
+    restyle() {}, // 핀 색은 CSS 토큰이라 테마를 저절로 따라간다
   };
 }
 
@@ -649,6 +680,7 @@ function draw(resolved) {
     gmap.setPins(mapped.map((r) => ({
       id: r.post.id,
       at: r.at,
+      full: r.post.applied >= r.post.needed, // 마감된 곳은 핀 색을 죽인다
       html: '<div class="win">' + winHtml(r.post) + "</div>",
     })));
     gmap.fitAll(mapped.map((r) => r.at));
