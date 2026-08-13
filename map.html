@@ -135,14 +135,17 @@
     transition: width 0.12s ease, height 0.12s ease;
   }
   .npin-wrap.on .npin { width: 20px; height: 20px; }
-  /* 네이버 말풍선은 내용 크기대로 감싸는 상자라, 폭을 못 정하면
-     글자가 한 줄에 한 자씩 떨어진다. 그래서 폭을 직접 지정한다.
-     또 상자의 왼쪽 위가 핀 좌표에 붙어 핀을 가리므로,
-     스스로 왼쪽·위로 물러나 핀 바로 위에 뜨게 한다. */
+  .mapwrap { position: relative; height: 100%; min-height: 0; }
+
+  /* 말풍선은 지도 위에 직접 띄운다. 핀은 항상 가로 가운데에 오도록 지도를 옮기므로
+     가로 위치는 고정이고, 세로만 계산해서 bottom으로 넣는다. */
   .nwin {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
     box-sizing: border-box;
     width: 250px;
-    transform: translate(-50%, calc(-100% - 6px));
     background: var(--card);
     color: var(--text);
     border: 1px solid var(--line);
@@ -200,7 +203,7 @@
       height: auto;
       min-height: 0;
     }
-    #map { height: 46vh; min-height: 300px; order: -1; }
+    .mapwrap { height: 46vh; min-height: 300px; order: -1; }
     .side { overflow: visible; max-height: none; }
   }
 </style>
@@ -230,7 +233,12 @@
       <div id="pins"></div>
       <div id="unmapped"></div>
     </div>
-    <div id="map"></div>
+    <div class="mapwrap">
+      <div id="map"></div>
+      <!-- 네이버 지도용 말풍선. 네이버 InfoWindow는 기준점이 예측대로 움직이지 않아
+           직접 띄운다. Leaflet 대체 지도에서는 쓰지 않는다. -->
+      <div class="nwin" id="mapWin" hidden></div>
+    </div>
   </div>
 </main>
 
@@ -372,23 +380,38 @@ function naverAdapter(onSelect) {
 
   let items = [];
   let overlays = {};
-  // disableAnchor를 켜면 상자의 왼쪽 위가 좌표에 붙어 핀을 가린다.
-  // 기본 앵커를 쓰면 핀 바로 위에 가운데로 뜬다. 꼬리는 배경을 없애 감춘다.
-  const info = new nm.InfoWindow({
-    content: "",
-    borderWidth: 0,
-    backgroundColor: "transparent",
-    anchorSize: new nm.Size(0, 12),
-    anchorSkew: false,
-    anchorColor: "transparent",
+  const win = document.getElementById("mapWin");
+  function closeWin() { win.hidden = true; }
+
+  win.addEventListener("click", function (e) {
+    if (e.target.closest("[data-close]")) closeWin();
   });
-  // 말풍선은 지도 위에 그려지는 그냥 HTML이라 닫기 버튼을 직접 연결해야 한다
-  mapEl.addEventListener("click", function (e) {
-    if (e.target.closest("[data-close]")) info.close();
-  });
+  // 지도를 끌면 핀이 움직이므로 말풍선은 닫는다
+  nm.Event.addListener(map, "dragstart", closeWin);
+  nm.Event.addListener(map, "zoom_start", closeWin);
+
+  // 말풍선을 핀 바로 위에 놓는다.
+  // setCenter 직후 핀은 지도 정중앙에 있으므로, 상자 높이만큼 자리가 모자라면
+  // 지도를 그만큼 내려 핀을 아래로 보내고, 그 위 공간에 상자를 놓는다.
+  function placeWindow(html) {
+    win.innerHTML =
+      '<button type="button" class="close" data-close="1" aria-label="닫기">&times;</button>' + html;
+    win.hidden = false;
+
+    const mapH = mapEl.getBoundingClientRect().height;
+    const h = win.getBoundingClientRect().height;
+    const middle = mapH / 2;                    // 지금 핀이 있는 자리
+    const wanted = Math.min(h + 18, mapH - 30); // 상자가 다 들어오는 핀 자리
+    const dy = Math.round(middle - wanted);
+    if (dy) map.panBy(new nm.Point(0, dy));     // 음수면 지도가 아래로 내려간다
+
+    // 핀이 wanted 위치에 오므로, 상자 아랫변을 그보다 6px 위에 둔다
+    win.style.bottom = mapH - wanted + 6 + "px";
+  }
 
   return {
     setPins(list) {
+      closeWin();
       Object.values(overlays).forEach(function (m) { m.setMap(null); });
       overlays = {};
       items = list;
@@ -419,14 +442,13 @@ function naverAdapter(onSelect) {
         });
         overlays[k].setZIndex(on ? 30 : 10);
       });
-      const pos = new nm.LatLng(it.at[0], it.at[1]);
-      map.morph(pos, Math.max(map.getZoom(), 14));
-      info.setContent('<div class="nwin">' +
-        '<button type="button" class="close" data-close="1" aria-label="닫기">&times;</button>' +
-        it.html + "</div>");
-      info.open(map, pos);
+      // 애니메이션(morph)으로 옮기면 뒤따르는 위치 계산과 어긋나므로 즉시 옮긴다
+      map.setZoom(Math.max(map.getZoom(), 14), false);
+      map.setCenter(new nm.LatLng(it.at[0], it.at[1]));
+      placeWindow(it.html);
     },
     fitAll(coords) {
+      closeWin();
       if (!coords.length) return;
       const b = new nm.LatLngBounds(
         new nm.LatLng(coords[0][0], coords[0][1]),
