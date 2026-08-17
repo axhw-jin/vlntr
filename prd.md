@@ -63,7 +63,7 @@
   - `create_opportunity()` / `update_opportunity()` / `set_opportunity_hidden()` /
     `delete_opportunity()` / `apply_to_opportunity()` / `cancel_application()`
     — 모두 `auth.uid()` 확인, 수정 계열은 소유자까지 확인. 로그아웃 상태(anon)에서는 실행 권한 없음
-- 배포: Vercel + GitHub(`hwax-js/vlntr`) 연동. main에 push하면 자동 배포
+- 배포: Vercel + GitHub(`axhw-jin/vlntr`) 연동. main에 push하면 자동 배포
 
 ## 다음 순서 (로드맵)
 
