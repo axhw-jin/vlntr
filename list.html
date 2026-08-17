@@ -50,6 +50,41 @@
   .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
   .count a { color: var(--accent); text-decoration: none; margin-left: 6px; }
   .count a:hover { text-decoration: underline; }
+  .filters {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .filters .f { display: grid; gap: 4px; min-width: 0; }
+  .filters label { font-size: 12px; color: var(--muted); }
+  /* 날짜 칸은 datepicker.js가 그리고 모양은 theme.css가 잡는다 */
+  .filters select {
+    font: inherit;
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--field);
+    color: var(--text);
+    min-width: 0;
+  }
+  .filters select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .filters .f.date { width: 132px; }
+  .filters .dash { color: var(--muted); padding-bottom: 9px; }
+  .filters .reset { margin-left: auto; }
+  /* 좁은 화면에서는 지역이 한 줄, 날짜 두 개가 그 아래 한 줄을 나눠 쓴다 */
+  @media (max-width: 560px) {
+    .filters .f.region { flex: 1 1 100%; }
+    .filters .f.date { flex: 1 1 0; }
+    .filters .dash { display: none; }
+    .filters .reset { margin-left: 0; flex: 1 1 100%; }
+  }
   /* 지도에서 넘어온 카드를 잠깐 강조한다 */
   .card.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
   @media (prefers-reduced-motion: no-preference) {
@@ -141,12 +176,29 @@
 </header>
 
 <main class="wrap">
+  <div class="filters" id="filters" hidden>
+    <div class="f region">
+      <label for="fRegion">지역</label>
+      <select id="fRegion"><option value="">전체 지역</option></select>
+    </div>
+    <div class="f date">
+      <label for="fFrom">시작일</label>
+      <div id="fFromDp"></div>
+    </div>
+    <span class="dash">~</span>
+    <div class="f date">
+      <label for="fTo">종료일</label>
+      <div id="fToDp"></div>
+    </div>
+    <button type="button" class="ghost reset" id="fReset" hidden>초기화</button>
+  </div>
   <p class="count" id="count"></p>
   <div id="list"><p class="status">불러오는 중…</p></div>
 </main>
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createDatePicker } from "./datepicker.js";
 
 const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -163,6 +215,9 @@ let openFormFor = null; // 신청 폼이 열린 기회 id
 const listEl = document.getElementById("list");
 const countEl = document.getElementById("count");
 const headEl = document.getElementById("headActions");
+const filtersEl = document.getElementById("filters");
+const regionEl = document.getElementById("fRegion");
+const resetEl = document.getElementById("fReset");
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) {
@@ -195,6 +250,141 @@ function renderHeader() {
     document.getElementById("signIn").addEventListener("click", signIn);
   }
 }
+
+// ── 지역·날짜 필터 ──────────────────────────────────────
+// location은 자유 입력이라 "서울 마포구 성산동"처럼 시/도가 맨 앞에 온다.
+// 첫 낱말만 떼어 지역으로 쓰되, 정식 명칭으로 적은 것은 짧은 이름에 합친다.
+// (안 그러면 "서울"과 "서울특별시"가 다른 항목으로 갈라진다)
+const REGION_ALIAS = {
+  서울특별시: "서울", 서울시: "서울",
+  부산광역시: "부산", 부산시: "부산",
+  대구광역시: "대구", 대구시: "대구",
+  인천광역시: "인천", 인천시: "인천",
+  광주광역시: "광주", 광주시: "광주",
+  대전광역시: "대전", 대전시: "대전",
+  울산광역시: "울산", 울산시: "울산",
+  세종특별자치시: "세종", 세종시: "세종",
+  경기도: "경기",
+  강원특별자치도: "강원", 강원도: "강원",
+  충청북도: "충북", 충청남도: "충남",
+  전북특별자치도: "전북", 전라북도: "전북", 전라남도: "전남",
+  경상북도: "경북", 경상남도: "경남",
+  제주특별자치도: "제주", 제주도: "제주",
+};
+
+function regionOf(location) {
+  const first = String(location || "").trim().split(/\s+/)[0] || "";
+  return REGION_ALIAS[first] || first;
+}
+
+// event_date는 "2026-08-22 (토)" 형태다. 앞 10자가 ISO 날짜라 문자열끼리
+// 비교해도 순서가 맞으므로 Date 객체를 만들 필요가 없다.
+function dateOf(p) {
+  const m = /^\d{4}-\d{2}-\d{2}/.exec(p.event_date || "");
+  return m ? m[0] : "";
+}
+
+// 주소창의 ?region=&from=&to= 가 시작 상태를 정한다.
+// onAuthStateChange가 즉시 한 번 울리므로 선언 시점에 읽어둔다.
+let filters = readFiltersFromUrl();
+
+function filtersActive() {
+  return Boolean(filters.region || filters.from || filters.to);
+}
+
+function matches(p) {
+  if (filters.region && regionOf(p.location) !== filters.region) return false;
+  if (filters.from || filters.to) {
+    const d = dateOf(p);
+    if (!d) return false; // 날짜를 못 읽는 기회는 기간을 지정하면 뺀다
+    if (filters.from && d < filters.from) return false;
+    if (filters.to && d > filters.to) return false;
+  }
+  return true;
+}
+
+// 필터를 주소창에 남겨 새로고침·공유해도 그대로 열리게 한다
+function readFiltersFromUrl() {
+  const q = new URLSearchParams(location.search);
+  return {
+    region: q.get("region") || "",
+    from: q.get("from") || "",
+    to: q.get("to") || "",
+  };
+}
+
+function writeFiltersToUrl() {
+  const q = new URLSearchParams();
+  if (filters.region) q.set("region", filters.region);
+  if (filters.from) q.set("from", filters.from);
+  if (filters.to) q.set("to", filters.to);
+  const qs = q.toString();
+  history.replaceState(null, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+}
+
+function renderFilters() {
+  const counts = new Map(); // 지역 → 건수
+  for (const p of posts) {
+    const r = regionOf(p.location);
+    if (r) counts.set(r, (counts.get(r) || 0) + 1);
+  }
+  const names = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ko"));
+  // 목록에 없는 지역이 주소로 들어와도 선택 상태는 유지한다
+  if (filters.region && !counts.has(filters.region)) names.push(filters.region);
+
+  regionEl.innerHTML =
+    '<option value="">전체 지역</option>' +
+    names
+      .map(
+        (n) =>
+          '<option value="' + esc(n) + '">' +
+          esc(n) + " (" + (counts.get(n) || 0) + ")" +
+          "</option>"
+      )
+      .join("");
+  regionEl.value = filters.region;
+  fromPicker.setValue(filters.from);
+  toPicker.setValue(filters.to);
+  resetEl.hidden = !filtersActive();
+  filtersEl.hidden = false;
+}
+
+function setFilter(key, v) {
+  filters[key] = v;
+  // 시작일이 종료일보다 뒤면 방금 건드리지 않은 쪽을 끌어와 빈 결과를 막는다
+  if (filters.from && filters.to && filters.from > filters.to) {
+    if (key === "from") filters.to = filters.from;
+    else if (key === "to") filters.from = filters.to;
+  }
+  writeFiltersToUrl();
+  render();
+}
+
+const fromPicker = createDatePicker({
+  mount: document.getElementById("fFromDp"),
+  id: "fFrom",
+  placeholder: "시작일",
+  value: filters.from,
+  onChange: (v) => setFilter("from", v),
+});
+
+const toPicker = createDatePicker({
+  mount: document.getElementById("fToDp"),
+  id: "fTo",
+  placeholder: "종료일",
+  value: filters.to,
+  onChange: (v) => setFilter("to", v),
+});
+
+regionEl.addEventListener("change", function () {
+  setFilter("region", regionEl.value);
+});
+
+resetEl.addEventListener("click", function () {
+  filters = { region: "", from: "", to: "" };
+  writeFiltersToUrl();
+  render();
+});
 
 async function loadPosts() {
   const { data, error } = await supabase
@@ -308,9 +498,18 @@ function card(p) {
 
 function render() {
   renderHeader();
+  renderFilters();
+
+  const shown = posts.filter(matches);
   countEl.innerHTML =
-    "모집 중인 기회 " + posts.length + '건 <a href="./map.html">지도로 보기</a>';
-  listEl.innerHTML = posts.map(card).join("");
+    (filtersActive()
+      ? "조건에 맞는 기회 " + shown.length + "건 / 전체 " + posts.length + "건"
+      : "모집 중인 기회 " + posts.length + "건") +
+    ' <a href="./map.html">지도로 보기</a>';
+
+  listEl.innerHTML = shown.length
+    ? shown.map(card).join("")
+    : '<p class="status">조건에 맞는 기회가 없습니다.</p>';
   jumpToHash();
 }
 
@@ -442,6 +641,7 @@ async function refresh() {
     listEl.innerHTML =
       '<p class="status error">기회를 불러오지 못했습니다. 새로고침해 주세요.</p>';
     countEl.textContent = "";
+    filtersEl.hidden = true;
   }
 }
 

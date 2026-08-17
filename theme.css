@@ -143,3 +143,129 @@ button.theme-toggle svg { width: 18px; height: 18px; }
 
 /* 헤더의 JS 렌더 영역이 flex 정렬에 그대로 참여하도록 */
 .head-slot { display: contents; }
+
+/* ── 날짜 선택기 (datepicker.js) ─────────────────────────
+   각 페이지의 인라인 <style>이 뒤에 오므로, theme-toggle과 같은 이유로
+   요소+클래스(button.dp-field)로 적어 우선순위를 확보한다. */
+.dp { position: relative; }
+
+button.dp-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+button.dp-field:hover { border-color: var(--accent); }
+button.dp-field[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+button.dp-field svg { width: 15px; height: 15px; flex: none; color: var(--muted); }
+.dp-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp-val.ph { color: var(--muted); }
+.dp-x {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.dp-x:hover { color: var(--text); background: var(--line); }
+
+.dp-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: 252px;
+  padding: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+.dp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dp-title { font-size: 14px; font-weight: 600; color: var(--text); }
+button.dp-nav {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.dp-nav:hover { background: var(--accent-weak); color: var(--accent); }
+
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp-wd span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+button.dp-day {
+  height: 32px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.dp-day:hover { background: var(--accent-weak); }
+button.dp-day.out { color: var(--muted); opacity: 0.4; }
+button.dp-day.today { color: var(--accent); font-weight: 700; }
+button.dp-day.sel { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+button.dp-day.sel:hover { background: var(--accent); }
+
+.dp-foot {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+button.dp-lnk {
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+button.dp-lnk:hover { color: var(--accent); border-color: var(--accent); }
+
+/* list.html 등의 `button:hover { filter: brightness(...) }` 가 달력까지
+   밝게 만들지 않도록, 더 높은 우선순위로 되돌린다 */
+.dp button.dp-field:hover,
+.dp .dp-pop button:hover { filter: none; }
