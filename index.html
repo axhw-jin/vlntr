@@ -53,18 +53,22 @@
     background: var(--card);
     padding: 56px 16px 64px;
   }
+  /* 제목은 폭 전체를 쓴다. 반쪽 칸에 넣으면 한 줄에 안 들어가
+     세 줄로 접히는데, 짧은 줄이 쌓여 덩어리가 답답해 보인다. */
+  /* margin 단축으로 쓰면 .wrap의 margin:0 auto(가운데 정렬)를 덮는다 */
+  .hero-head { margin-bottom: 36px; }
   .hero-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    align-items: center;
+    align-items: start;
     gap: 32px;
   }
-  .hero-copy > * { animation: rise 0.5s ease-out both; }
-  .hero-copy > *:nth-child(1) { animation-delay: 0.05s; }
-  .hero-copy > *:nth-child(2) { animation-delay: 0.2s; }
-  .hero-copy > *:nth-child(3) { animation-delay: 0.35s; }
-  .hero-copy > *:nth-child(4) { animation-delay: 0.5s; }
-  .hero-copy > *:nth-child(5) { animation-delay: 0.65s; }
+  .hero-head > *, .hero-copy > * { animation: rise 0.5s ease-out both; }
+  .hero-head > *:nth-child(1) { animation-delay: 0.05s; }
+  .hero-head > *:nth-child(2) { animation-delay: 0.2s; }
+  .hero-copy > *:nth-child(1) { animation-delay: 0.35s; }
+  .hero-copy > *:nth-child(2) { animation-delay: 0.5s; }
+  .hero-copy > *:nth-child(3) { animation-delay: 0.65s; }
   @keyframes rise {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: none; }
@@ -78,18 +82,23 @@
     50% { transform: translateY(-8px); }
   }
 
+  /* 이름의 유래를 말로 설명하는 대신 눈으로 보이게 한다.
+     모음을 흐리게 두면 또렷하게 남는 글자가 v·l·n·t·r 이다. */
   .eyebrow {
     display: inline-block;
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
     color: var(--accent);
     background: var(--accent-weak);
     border-radius: 999px;
-    padding: 3px 11px;
+    padding: 4px 13px;
     margin: 0 0 16px;
   }
+  .eyebrow i { font-style: normal; font-weight: 400; opacity: 0.3; }
   h1 {
     margin: 0 0 12px;
-    font-size: 46px;
+    font-size: 54px;
     line-height: 1.25;
     letter-spacing: -0.025em;
     word-break: keep-all; /* 한글이 낱말 중간에서 끊기지 않게 */
@@ -124,7 +133,7 @@
   .stat span { font-size: 13px; color: var(--muted); }
 
   /* 이미지 콜라주 */
-  .collage { position: relative; height: 480px; }
+  .collage { position: relative; height: 430px; }
   .collage figure {
     position: absolute;
     margin: 0;
@@ -156,6 +165,7 @@
   @media (max-width: 860px) {
     .hero { padding: 40px 16px 48px; }
     .hero-grid { grid-template-columns: 1fr; gap: 8px; }
+    .hero-head { margin-bottom: 20px; text-align: center; }
     .hero-copy { text-align: center; }
     .lede { margin-left: auto; margin-right: auto; }
     .cta, .stats { justify-content: center; }
@@ -190,7 +200,7 @@
     .blob { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .hero-copy > *, .collage figure, .blob { animation: none; }
+    .hero-head > *, .hero-copy > *, .collage figure, .blob { animation: none; }
   }
 
   section { padding: 32px 0; border-top: 1px solid var(--line); }
@@ -275,10 +285,13 @@
 </script>
 
 <div class="hero">
+  <div class="wrap hero-head">
+    <span class="eyebrow" aria-label="volunteer" title="volunteer에서 남은 자음 — vlntr">v<i>o</i>l<i>u</i>nt<i>ee</i>r</span>
+    <h1>봉사자와 피봉사자를 잇습니다.</h1>
+  </div>
+
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <span class="eyebrow">봉사 기회 매칭</span>
-      <h1>봉사자와<br>피봉사자를<br>잇습니다.</h1>
       <p class="lede">
         도울 마음은 있는데 어디서부터 시작할지 모를 때가 있습니다.
         멀리 갈 것 없이, 가까운 곳에도 도움의 손길이 필요한 곳이 있습니다.
