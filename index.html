@@ -22,17 +22,6 @@
   /* 헤더·히어로·본문·푸터가 같은 좌측 기준선을 쓰도록 폭을 통일한다 */
   .wrap { max-width: 1040px; margin: 0 auto; }
 
-  header {
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
-    padding: 14px 16px;
-  }
-  .head-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-  .brand { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-  /* 로그인 상태에서는 버튼이 많아지므로, 좁은 화면에서 줄바꿈되도록
-     flex:none 대신 줄어들 수 있게 둔다 */
-  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
-  .who { font-size: 13px; color: var(--muted); }
 
   a.btn, button {
     font: inherit;
@@ -272,24 +261,20 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap head-row">
-    <span class="brand">vlntr</span>
-    <div class="head-actions">
-      <span class="head-slot" id="headActions"></span>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
-    </div>
-  </div>
-</header>
+<header id="topbar"></header>
+<script type="module">
+  import { mountNav } from "./nav.js";
+  window.vlntrNav = mountNav({ current: "home" });
+</script>
 
 <div class="hero">
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">봉사 기회 매칭</span>
-      <h1>봉사할 사람과<br>봉사할 곳을 잇습니다.</h1>
+      <h1>봉사자와<br>피봉사자를 잇습니다.</h1>
       <p class="lede">
-        기관은 활동을 올리고, 참여자는 이름과 연락처를 남겨 신청합니다.
-        중간 절차 없이, 명단은 바로 기관에게 전달됩니다.
+        누군가에게 남는 두 시간이, 누군가에게는 하루를 바꾸는 손길이 됩니다.
+        가까운 곳에서 지금 기다리고 있는 자리를 만나보세요.
       </p>
       <div class="cta">
         <a class="btn" href="./list.html">봉사 기회 둘러보기</a>
@@ -434,7 +419,6 @@ const SUPABASE_ANON_KEY =
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const headEl = document.getElementById("headActions");
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) {
@@ -443,27 +427,18 @@ function esc(s) {
 }
 
 function renderHeader(user) {
-  if (user) {
-    const label = user.user_metadata?.name || user.email || "로그인됨";
-    headEl.innerHTML =
-      '<span class="who">' + esc(label) + "</span>" +
-      '<a class="btn" href="./new.html">기회 등록</a>' +
-      '<a class="btn ghost" href="./mypage.html">마이페이지</a>' +
-      '<button class="ghost" id="signOut">로그아웃</button>';
-    document.getElementById("signOut").addEventListener("click", function () {
-      supabase.auth.signOut();
-    });
-  } else {
-    headEl.innerHTML =
-      '<a class="btn ghost" href="./list.html">기회 목록</a>' +
-      '<button id="signIn">구글로 로그인</button>';
-    document.getElementById("signIn").addEventListener("click", function () {
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: location.origin + location.pathname },
-      });
-    });
-  }
+  window.vlntrNav.setAuth(user, signIn, signOut);
+}
+
+function signIn() {
+  supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + location.pathname },
+  });
+}
+
+function signOut() {
+  supabase.auth.signOut();
 }
 
 // 히어로 지표를 실제 DB 값으로 채운다. 실패하면 "—" 그대로 둔다.

@@ -15,19 +15,7 @@
     font-family: system-ui, "Malgun Gothic", sans-serif;
     line-height: 1.55;
   }
-  header {
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
-    padding: 20px 16px;
-  }
   .wrap { max-width: 1160px; margin: 0 auto; }
-  h1 { margin: 0; font-size: 20px; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
-  .who { font-size: 13px; color: var(--muted); }
-  a.home { color: inherit; text-decoration: none; }
-  a.home:hover { color: var(--accent); }
 
   a.btn, button {
     font: inherit;
@@ -61,7 +49,7 @@
     display: grid;
     grid-template-columns: 320px 1fr;
     gap: 16px;
-    height: calc(100vh - 190px);
+    height: calc(100vh - 162px);
     min-height: 440px;
   }
   .side { overflow-y: auto; padding-right: 4px; }
@@ -226,24 +214,14 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap head-row">
-    <div>
-      <h1><a class="home" href="./index.html">vlntr</a></h1>
-      <p>봉사 기회를 지도에서 확인하세요.</p>
-    </div>
-    <div class="head-actions">
-      <span class="head-slot" id="headActions"></span>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
-    </div>
-  </div>
-</header>
+<header id="topbar"></header>
+<script type="module">
+  import { mountNav } from "./nav.js";
+  window.vlntrNav = mountNav({ current: "map" });
+</script>
 
 <main class="wrap">
-  <p class="toolbar">
-    <span id="count">불러오는 중…</span>
-    <a href="./list.html">목록으로 보기</a>
-  </p>
+  <p class="toolbar"><span id="count">불러오는 중…</span></p>
   <div class="split">
     <div class="side">
       <p class="fallback-note" id="fallbackNote" hidden></p>
@@ -277,7 +255,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const SEOUL = [37.5665, 126.978];
 const GEO_KEY = "vlntr-geo-v1";
 
-const headEl = document.getElementById("headActions");
 const countEl = document.getElementById("count");
 const pinsEl = document.getElementById("pins");
 const unmappedEl = document.getElementById("unmapped");
@@ -315,27 +292,18 @@ function mapPinHtml(it, on) {
 }
 
 function renderHeader() {
-  if (user) {
-    const label = user.user_metadata?.name || user.email || "로그인됨";
-    headEl.innerHTML =
-      '<span class="who">' + esc(label) + "</span>" +
-      '<a class="btn" href="./new.html">기회 등록</a>' +
-      '<a class="btn ghost" href="./mypage.html">마이페이지</a>' +
-      '<button class="ghost" id="signOut">로그아웃</button>';
-    document.getElementById("signOut").addEventListener("click", function () {
-      supabase.auth.signOut();
-    });
-  } else {
-    headEl.innerHTML =
-      '<a class="btn ghost" href="./list.html">기회 목록</a>' +
-      '<button id="signIn">구글로 로그인</button>';
-    document.getElementById("signIn").addEventListener("click", function () {
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: location.origin + location.pathname },
-      });
-    });
-  }
+  window.vlntrNav.setAuth(user, signIn, signOut);
+}
+
+function signIn() {
+  supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + location.pathname },
+  });
+}
+
+function signOut() {
+  supabase.auth.signOut();
 }
 
 // ── 스크립트 로더 ───────────────────────────────────────

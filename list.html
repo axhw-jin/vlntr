@@ -15,19 +15,9 @@
     font-family: system-ui, "Malgun Gothic", sans-serif;
     line-height: 1.55;
   }
-  header {
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
-    padding: 20px 16px;
-  }
   .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { margin: 0; font-size: 20px; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   /* 로그인 상태에서는 버튼이 많아지므로, 좁은 화면에서 줄바꿈되도록
      flex:none 대신 줄어들 수 있게 둔다 */
-  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
-  .who { font-size: 13px; color: var(--muted); }
   a.btn, button {
     font: inherit;
     font-size: 14px;
@@ -157,25 +147,20 @@
   }
   .status { color: var(--muted); font-size: 14px; padding: 24px 0; text-align: center; }
   .status.error { color: var(--err); }
-  a.home { color: inherit; text-decoration: none; }
-  a.home:hover { color: var(--accent); }
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap head-row">
-    <div>
-      <h1><a class="home" href="./index.html">vlntr</a></h1>
-      <p>봉사 기회를 확인하고 참여를 신청하세요.</p>
-    </div>
-    <div class="head-actions">
-      <span class="head-slot" id="headActions"></span>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
-    </div>
-  </div>
-</header>
+<header id="topbar"></header>
+<script type="module">
+  import { mountNav } from "./nav.js";
+  window.vlntrNav = mountNav({ current: "list" });
+</script>
 
 <main class="wrap">
+  <div class="page-head">
+    <h1>봉사 기회</h1>
+    <p>마음이 가는 활동을 찾아 신청해 보세요.</p>
+  </div>
   <div class="filters" id="filters" hidden>
     <div class="f region">
       <label for="fRegion">지역</label>
@@ -199,6 +184,7 @@
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createDatePicker } from "./datepicker.js";
+import { regionOf } from "./regions.js";
 
 const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -214,7 +200,6 @@ let openFormFor = null; // 신청 폼이 열린 기회 id
 
 const listEl = document.getElementById("list");
 const countEl = document.getElementById("count");
-const headEl = document.getElementById("headActions");
 const filtersEl = document.getElementById("filters");
 const regionEl = document.getElementById("fRegion");
 const resetEl = document.getElementById("fReset");
@@ -237,45 +222,10 @@ async function signOut() {
 }
 
 function renderHeader() {
-  if (user) {
-    const label = user.user_metadata?.name || user.email || "로그인됨";
-    headEl.innerHTML =
-      '<span class="who">' + esc(label) + "</span>" +
-      '<a class="btn" href="./new.html">기회 등록</a>' +
-      '<a class="btn ghost" href="./mypage.html">마이페이지</a>' +
-      '<button class="ghost" id="signOut">로그아웃</button>';
-    document.getElementById("signOut").addEventListener("click", signOut);
-  } else {
-    headEl.innerHTML = '<button id="signIn">구글로 로그인</button>';
-    document.getElementById("signIn").addEventListener("click", signIn);
-  }
+  window.vlntrNav.setAuth(user, signIn, signOut);
 }
 
 // ── 지역·날짜 필터 ──────────────────────────────────────
-// location은 자유 입력이라 "서울 마포구 성산동"처럼 시/도가 맨 앞에 온다.
-// 첫 낱말만 떼어 지역으로 쓰되, 정식 명칭으로 적은 것은 짧은 이름에 합친다.
-// (안 그러면 "서울"과 "서울특별시"가 다른 항목으로 갈라진다)
-const REGION_ALIAS = {
-  서울특별시: "서울", 서울시: "서울",
-  부산광역시: "부산", 부산시: "부산",
-  대구광역시: "대구", 대구시: "대구",
-  인천광역시: "인천", 인천시: "인천",
-  광주광역시: "광주", 광주시: "광주",
-  대전광역시: "대전", 대전시: "대전",
-  울산광역시: "울산", 울산시: "울산",
-  세종특별자치시: "세종", 세종시: "세종",
-  경기도: "경기",
-  강원특별자치도: "강원", 강원도: "강원",
-  충청북도: "충북", 충청남도: "충남",
-  전북특별자치도: "전북", 전라북도: "전북", 전라남도: "전남",
-  경상북도: "경북", 경상남도: "경남",
-  제주특별자치도: "제주", 제주도: "제주",
-};
-
-function regionOf(location) {
-  const first = String(location || "").trim().split(/\s+/)[0] || "";
-  return REGION_ALIAS[first] || first;
-}
 
 // event_date는 "2026-08-22 (토)" 형태다. 앞 10자가 ISO 날짜라 문자열끼리
 // 비교해도 순서가 맞으므로 Date 객체를 만들 필요가 없다.

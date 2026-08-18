@@ -15,19 +15,9 @@
     font-family: system-ui, "Malgun Gothic", sans-serif;
     line-height: 1.55;
   }
-  header {
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
-    padding: 20px 16px;
-  }
   .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { margin: 0; font-size: 20px; }
-  h1 a { color: inherit; text-decoration: none; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   /* 로그인 상태에서는 버튼이 많아지므로, 좁은 화면에서 줄바꿈되도록
      flex:none 대신 줄어들 수 있게 둔다 */
-  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; min-width: 0; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
@@ -141,20 +131,17 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap head-row">
-    <div>
-      <h1><a href="./index.html">마이페이지</a></h1>
-      <p id="who">내가 올린 기회와 신청 내역을 관리합니다.</p>
-    </div>
-    <div class="head-actions">
-      <span class="head-slot" id="headActions"></span>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="화면 테마 전환"></button>
-    </div>
-  </div>
-</header>
+<header id="topbar"></header>
+<script type="module">
+  import { mountNav } from "./nav.js";
+  window.vlntrNav = mountNav({ current: "mypage" });
+</script>
 
 <main class="wrap">
+  <div class="page-head">
+    <h1>마이페이지</h1>
+    <p id="who">내가 올린 기회와 신청 내역을 관리합니다.</p>
+  </div>
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="mine" aria-selected="true">내가 올린 기회</button>
     <button role="tab" data-tab="applied" aria-selected="false">내 신청 내역</button>
@@ -179,7 +166,6 @@ let applied = [];       // 내 신청 내역 (기회 정보 포함)
 let confirmDeleteId = null;
 
 const panel = document.getElementById("panel");
-const headEl = document.getElementById("headActions");
 const whoEl = document.getElementById("who");
 
 function esc(s) {
@@ -189,26 +175,21 @@ function esc(s) {
 }
 
 function renderHeader() {
-  if (user) {
-    const label = user.user_metadata?.name || user.email || "로그인됨";
-    whoEl.textContent = label + " 님의 활동입니다.";
-    headEl.innerHTML =
-      '<a class="btn" href="./new.html">기회 등록</a>' +
-      '<a class="btn ghost" href="./list.html">기회 목록</a>' +
-      '<button class="ghost" id="signOut">로그아웃</button>';
-    document.getElementById("signOut").addEventListener("click", function () {
-      supabase.auth.signOut();
-    });
-  } else {
-    whoEl.textContent = "내가 올린 기회와 신청 내역을 관리합니다.";
-    headEl.innerHTML = '<button id="signIn">구글로 로그인</button>';
-    document.getElementById("signIn").addEventListener("click", function () {
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: location.origin + location.pathname },
-      });
-    });
-  }
+  whoEl.textContent = user
+    ? (user.user_metadata?.name || user.email || "로그인됨") + " 님의 활동입니다."
+    : "내가 올린 기회와 신청 내역을 관리합니다.";
+  window.vlntrNav.setAuth(user, signIn, signOut);
+}
+
+function signIn() {
+  supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + location.pathname },
+  });
+}
+
+function signOut() {
+  supabase.auth.signOut();
 }
 
 // 전역 상태에 직접 push하면, 로그인 직후처럼 refresh()가 겹쳐 실행될 때

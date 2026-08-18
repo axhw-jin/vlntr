@@ -39,7 +39,8 @@
 
   function mount() {
     var btn = document.getElementById("themeToggle");
-    if (!btn) return;
+    if (!btn || btn.dataset.themeBound) return;
+    btn.dataset.themeBound = "1"; // nav.js가 버튼을 다시 그리면 mount()를 또 부른다
 
     function paint() {
       var dark = current() === "dark";
@@ -67,6 +68,9 @@
 
     paint();
   }
+
+  // nav.js가 헤더를 그린 뒤 버튼을 다시 붙일 수 있게 열어둔다
+  window.vlntrTheme = { mount: mount };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mount);
