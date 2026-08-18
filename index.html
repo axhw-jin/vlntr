@@ -55,56 +55,43 @@
     padding: 76px 16px 84px;
   }
 
-  /* 글자 뒤에서 천천히 도는 사진 링.
-     링(.ring)이 돌면 사진도 같이 뒤집히므로, 안쪽 <img>를 같은 속도로 반대로
-     돌려 늘 똑바로 서 있게 한다. figure의 rotate(--a)는 .tile이 되돌린다.
-     (한 요소에서 정지 transform과 애니메이션 transform을 같이 못 쓰기 때문에
-      링 → figure → tile → img 로 층을 나눴다) */
+  /* 글자 뒤에서 오른쪽으로 천천히 흐르는 사진 띠.
+     같은 사진 묶음을 두 벌 이어 붙이고 -50% → 0 으로 밀면, 두 번째 벌이
+     첫 번째 벌 자리에 정확히 겹치는 순간 되감기므로 이음매가 보이지 않는다. */
   .hero-bg {
     position: absolute;
     inset: 0;
     z-index: 0;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: stretch;
     pointer-events: none;
-    opacity: var(--hero-bg-op, 0.42);
-    /* 사진이 아니라 결로 읽히게 살짝 흐린다 */
+    opacity: var(--hero-bg-op, 0.5);
     filter: blur(1.5px);
   }
-  .ring {
-    position: relative;
-    width: 0;
-    height: 0;
-    animation: spin 150s linear infinite;
-  }
-  .ring figure {
-    position: absolute;
-    top: 0;
-    left: 0;
-    margin: 0;
-    width: var(--w);
-    height: var(--w);
-    margin-left: calc(var(--w) / -2);
-    margin-top: calc(var(--w) / -2);
-    transform: rotate(var(--a)) translate(var(--r));
-  }
-  .ring .tile {
-    display: block;
-    width: 100%;
+  .marquee { width: 100%; height: 100%; overflow: hidden; }
+  .row {
+    display: flex;
     height: 100%;
-    transform: rotate(calc(-1 * var(--a)));
+    width: max-content;
+    animation: drift 80s linear infinite;
   }
-  .ring img {
+  .row figure {
+    flex: none;
+    margin: 0 12px 0 0;
+    width: 520px;
+    height: 100%;
+  }
+  .row img {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 20px;
     filter: var(--img-dim);
-    animation: spin-back 150s linear infinite;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes spin-back { to { transform: rotate(-360deg); } }
+  @keyframes drift {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0); }
+  }
 
   /* 글자가 놓이는 왼쪽은 배경을 덮어 대비를 지킨다 */
   .hero-veil {
@@ -112,11 +99,14 @@
     inset: 0;
     z-index: 1;
     pointer-events: none;
-    background:
-      /* 글자가 앉는 왼쪽·가운데를 덮는다 */
-      radial-gradient(66% 78% at 32% 50%, var(--card) 0%, rgba(0, 0, 0, 0) 100%),
-      /* 가장자리로 갈수록 사라지게 */
-      radial-gradient(95% 72% at 50% 50%, rgba(0, 0, 0, 0) 52%, var(--card) 100%);
+    /* 글자가 앉는 왼쪽을 덮어 대비를 지킨다.
+       위아래는 덮지 않는다 — 사진이 히어로 끝까지 닿아야 하기 때문이다. */
+    background: linear-gradient(
+      to right,
+      var(--card) 0%,
+      var(--card) 40%,
+      rgba(0, 0, 0, 0) 76%
+    );
   }
   .hero-head, .hero-copy { position: relative; z-index: 2; }
   /* 제목은 폭 전체를 쓴다. 반쪽 칸에 넣으면 한 줄에 안 들어가
@@ -136,22 +126,35 @@
 
   /* 이름의 유래를 말로 설명하는 대신 눈으로 보이게 한다.
      모음을 흐리게 두면 또렷하게 남는 글자가 v·l·n·t·r 이다. */
+  /* 두 줄의 좌우 폭을 정확히 맞춘다.
+     글자 하나하나를 flex 항목으로 두고 space-between 으로 벌리면, 짧은 쪽
+     (platform)이 긴 쪽(volunteer)의 폭까지 저절로 늘어난다. letter-spacing 값을
+     손으로 맞추는 방법은 글꼴이 바뀌면 어긋나지만, 이 방법은 어떤 글꼴에서도 맞는다. */
   .eyebrow {
+    position: relative;
     display: inline-block;
     font-size: 14px;
     font-weight: 700;
-    line-height: 1.4;
-    letter-spacing: 0.16em;
-    text-align: left;
+    line-height: 1.45;
+    letter-spacing: 0.1em;
     color: var(--accent);
     background: var(--accent-weak);
     border-radius: 12px;
     padding: 7px 13px;
     margin: 0 0 16px;
   }
-  .eyebrow i { font-style: normal; font-weight: 400; opacity: 0.3; }
-  /* 아랫줄. 흐린 모음과 달리 또렷하게 둬서 v·l·n·t·r 과 한 짝으로 읽히게 한다 */
-  .eyebrow em { display: block; font-style: normal; }
+  .eb-line { display: flex; justify-content: space-between; }
+  .eyebrow i { font-style: normal; }
+  /* 모음. 흐리게 두면 또렷하게 남는 글자가 v·l·n·t·r 이다 */
+  .eyebrow i.d { font-weight: 400; opacity: 0.3; }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   h1 {
     margin: 0 0 12px;
     font-size: 54px;
@@ -198,11 +201,11 @@
     h1 { font-size: 30px; }
     /* 좁은 화면에서는 링을 줄이고 더 흐리게 둔다 — 글자 대비가 먼저다 */
     .hero-bg { --hero-bg-op: 0.18; }
-    .ring { transform: scale(0.62); }
+    .row figure { width: 260px; margin-right: 8px; }
     .lede, .hero-copy { margin-left: auto; margin-right: auto; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .hero-head > *, .hero-copy > *, .ring, .ring img { animation: none; }
+    .hero-head > *, .hero-copy > *, .row { animation: none; }
   }
 
   section { padding: 32px 0; border-top: 1px solid var(--line); }
@@ -289,24 +292,42 @@
 <div class="hero">
   <div class="hero-veil" aria-hidden="true"></div>
   <div class="hero-bg" aria-hidden="true">
-    <div class="ring">
-      <figure style="--a:0deg; --r:430px; --w:200px"><span class="tile"><img src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:30deg; --r:500px; --w:160px"><span class="tile"><img src="https://images.unsplash.com/photo-1628717341663-0007b0ee2597?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:60deg; --r:465px; --w:180px"><span class="tile"><img src="https://images.unsplash.com/photo-1652971876875-05db98fab376?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:90deg; --r:430px; --w:200px"><span class="tile"><img src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:120deg; --r:500px; --w:160px"><span class="tile"><img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:150deg; --r:465px; --w:180px"><span class="tile"><img src="https://images.unsplash.com/photo-1461532257246-777de18cd58b?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:180deg; --r:430px; --w:200px"><span class="tile"><img src="https://images.unsplash.com/photo-1599059813005-11265ba4b4ce?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:210deg; --r:500px; --w:160px"><span class="tile"><img src="https://images.unsplash.com/photo-1593113616828-6f22bca04804?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:240deg; --r:465px; --w:180px"><span class="tile"><img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:270deg; --r:430px; --w:200px"><span class="tile"><img src="https://images.unsplash.com/photo-1616680214084-22670de1bc82?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:300deg; --r:500px; --w:160px"><span class="tile"><img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
-      <figure style="--a:330deg; --r:465px; --w:180px"><span class="tile"><img src="https://images.unsplash.com/photo-1593113630400-ea4288922497?q=80&w=420&auto=format&fit=crop" alt="" loading="lazy"></span></figure>
+    <div class="marquee">
+      <div class="row">
+        <figure><img src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1628717341663-0007b0ee2597?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1652971876875-05db98fab376?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1461532257246-777de18cd58b?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1599059813005-11265ba4b4ce?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113616828-6f22bca04804?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1616680214084-22670de1bc82?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113630400-ea4288922497?q=80&w=700&auto=format&fit=crop" alt="" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1628717341663-0007b0ee2597?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1652971876875-05db98fab376?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1461532257246-777de18cd58b?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1599059813005-11265ba4b4ce?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113616828-6f22bca04804?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1616680214084-22670de1bc82?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+        <figure><img src="https://images.unsplash.com/photo-1593113630400-ea4288922497?q=80&w=700&auto=format&fit=crop" alt="" aria-hidden="true" loading="lazy"></figure>
+      </div>
     </div>
   </div>
 
   <div class="wrap hero-head">
-    <span class="eyebrow" aria-label="volunteer platform" title="volunteer에서 남은 자음 — vlntr">v<i>o</i>l<i>u</i>nt<i>ee</i>r<em>platform</em></span>
+    <span class="eyebrow" title="volunteer에서 남은 자음 — vlntr">
+      <span class="sr-only">volunteer platform</span>
+      <span class="eb-line" aria-hidden="true"><i>v</i><i class="d">o</i><i>l</i><i class="d">u</i><i>n</i><i>t</i><i class="d">e</i><i class="d">e</i><i>r</i></span>
+      <span class="eb-line" aria-hidden="true"><i>p</i><i>l</i><i>a</i><i>t</i><i>f</i><i>o</i><i>r</i><i>m</i></span>
+    </span>
     <h1>봉사자와 피봉사자를 잇습니다.</h1>
   </div>
 

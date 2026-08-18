@@ -30,7 +30,7 @@
 
   --shadow: rgba(16, 24, 40, 0.1);
   --img-dim: none;   /* 다크에서 사진이 너무 튀지 않게 */
-  --hero-bg-op: 0.42; /* 랜딩 배경에서 도는 사진의 진하기 */
+  --hero-bg-op: 0.5; /* 랜딩 배경에서 도는 사진의 진하기 */
   --map-dim: none;   /* 지도 타일 (map.html) */
   --pin: #2563eb;      /* 지도 핀 (map.html) */
   --pin-off: #98a2b3;  /* 모집이 끝난 곳 */
@@ -71,7 +71,7 @@
 
   --shadow: rgba(0, 0, 0, 0.5);
   --img-dim: brightness(0.86) saturate(0.95);
-  --hero-bg-op: 0.3;
+  --hero-bg-op: 0.38;
   --map-dim: brightness(0.62) saturate(1.2) contrast(1.06);
   --pin: #4f8ef7;
   --pin-off: #7c8598;
@@ -113,7 +113,7 @@
 
     --shadow: rgba(0, 0, 0, 0.5);
     --img-dim: brightness(0.86) saturate(0.95);
-    --hero-bg-op: 0.3;
+    --hero-bg-op: 0.38;
     --map-dim: brightness(0.62) saturate(1.2) contrast(1.06);
     --pin: #4f8ef7;
     --pin-off: #7c8598;
