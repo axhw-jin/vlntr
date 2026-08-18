@@ -116,7 +116,7 @@
 
     <label>
       <span>날짜</span>
-      <input name="date" type="date" required>
+      <div id="dateDp"></div>
     </label>
 
     <label>
@@ -159,6 +159,7 @@
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createDatePicker } from "./datepicker.js";
 
 const SUPABASE_URL = "https://cpkslszdgbdjhwpayocy.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -187,6 +188,14 @@ function formatDate(value) {
   if (isNaN(d)) return value;
   return value + " (" + WEEKDAYS[d.getDay()] + ")";
 }
+
+// 날짜는 list.html의 필터와 같은 달력을 쓴다.
+// 네이티브 required가 없으므로 제출할 때 직접 확인한다.
+const datePicker = createDatePicker({
+  mount: document.getElementById("dateDp"),
+  id: "fDate",
+  placeholder: "날짜 선택",
+});
 
 function fillTimeSelects() {
   const pad = (n) => String(n).padStart(2, "0");
@@ -252,7 +261,7 @@ async function loadForEdit(user) {
   f.title.value = data.title;
   f.org.value = data.org;
   f.location.value = data.location;
-  f.date.value = (/^\d{4}-\d{2}-\d{2}/.exec(data.event_date) || [""])[0];
+  datePicker.setValue((/^\d{4}-\d{2}-\d{2}/.exec(data.event_date) || [""])[0]);
   const t = /^(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})$/.exec(data.event_time || "");
   if (t) { setTime("start", t[1]); setTime("end", t[2]); }
   f.needed.value = data.needed;
@@ -273,8 +282,15 @@ form.addEventListener("submit", async function (e) {
   e.preventDefault();
 
   const f = form.elements;
+  const date = datePicker.getValue();
   const start = readTime("start");
   const end = readTime("end");
+
+  if (!date) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "날짜를 선택해 주세요.";
+    return;
+  }
 
   if (end <= start) {
     msgEl.className = "msg error";
@@ -290,7 +306,7 @@ form.addEventListener("submit", async function (e) {
     p_title: f.title.value.trim(),
     p_org: f.org.value.trim(),
     p_location: f.location.value.trim(),
-    p_event_date: formatDate(f.date.value),
+    p_event_date: formatDate(date),
     p_event_time: start + " ~ " + end,
     p_needed: Number(f.needed.value),
     p_description: f.description.value.trim(),
